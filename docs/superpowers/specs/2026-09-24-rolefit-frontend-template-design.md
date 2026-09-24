@@ -23,7 +23,6 @@ wiring real APIs later only changes that layer.
 - Tailwind CSS v4 + shadcn/ui (Radix) components, lucide-react icons
 - Font: Plus Jakarta Sans via `next/font/google`
 - `next-themes` for light/dark mode
-- Vitest for unit tests of `src/lib`
 
 ## Design tokens (from approved mockups)
 
@@ -142,10 +141,8 @@ Static pages (landing) are server components.
   under the content on mobile.
 - `prefers-reduced-motion` respected.
 
-## Testing
+## Verification
 
-- Vitest unit tests for `src/lib/match.ts` (tier boundaries) and the mock API
-  (filters in `searchJobs`, status transitions in `updateApplicationStatus`,
-  `publishJob`/`closeJob`/`reopenJob`, `submitApplication` rejecting closed jobs).
-- `npm run lint`, `npm run build`, and `npm test` must pass.
+- No automated tests in this iteration (deferred by request).
+- `npm run lint` and `npm run build` must pass.
 - Manual check of key routes in the browser at desktop and mobile widths.
