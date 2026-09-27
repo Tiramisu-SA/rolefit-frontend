@@ -1,11 +1,18 @@
 import type { Application } from "@/lib/types";
 
+/** The one mock seeker in this browser (the real profile belongs to them). */
+export const SEEKER_ID = "me";
+
+// Job ids match the Job Posting Service seed (npm run seed in that repo).
+// Applicants are copied into each application, as submitApplication does.
+
 export const applications: Application[] = [
-  // --- cand-1's own applications (to non-Brightline jobs) ---
+  // --- the mock seeker's own applications (to non-Brightline jobs) ---
   {
     id: "app-1",
-    jobId: "job-harbor-junior",
-    candidateId: "cand-1",
+    jobId: "job_seed_harbor_junior",
+    candidateId: SEEKER_ID,
+    candidate: { id: "me", name: "Pimchanok Srisuk", initials: "PS", headline: "Frontend Developer · Bangkok, Thailand", email: "pimchanok.srisuk@example.com" },
     resumeDraftId: "draft-seed-1",
     resumeFormat: "personal",
     status: "Interview",
@@ -24,8 +31,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-2",
-    jobId: "job-cobalt-intern",
-    candidateId: "cand-1",
+    jobId: "job_seed_cobalt_intern",
+    candidateId: SEEKER_ID,
+    candidate: { id: "me", name: "Pimchanok Srisuk", initials: "PS", headline: "Frontend Developer · Bangkok, Thailand", email: "pimchanok.srisuk@example.com" },
     resumeDraftId: "draft-seed-2",
     resumeFormat: "personal",
     status: "Under review",
@@ -43,8 +51,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-3",
-    jobId: "job-lotus-web",
-    candidateId: "cand-1",
+    jobId: "job_seed_lotus_web",
+    candidateId: SEEKER_ID,
+    candidate: { id: "me", name: "Pimchanok Srisuk", initials: "PS", headline: "Frontend Developer · Bangkok, Thailand", email: "pimchanok.srisuk@example.com" },
     resumeDraftId: "draft-seed-3",
     resumeFormat: "personal",
     status: "Offer",
@@ -64,8 +73,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-4",
-    jobId: "job-atlas-platform",
-    candidateId: "cand-1",
+    jobId: "job_seed_atlas_platform",
+    candidateId: SEEKER_ID,
+    candidate: { id: "me", name: "Pimchanok Srisuk", initials: "PS", headline: "Frontend Developer · Bangkok, Thailand", email: "pimchanok.srisuk@example.com" },
     resumeDraftId: "draft-seed-4",
     resumeFormat: "personal",
     status: "Rejected",
@@ -86,8 +96,9 @@ export const applications: Application[] = [
   // --- Brightline Frontend Developer applicants (Review applicants mockup) ---
   {
     id: "app-5",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-2",
+    candidate: { id: "cand-2", name: "Kittipat Wongsa", initials: "KW", headline: "Junior Developer · Nova Systems", email: "kittipat.wongsa@example.com" },
     resumeDraftId: "draft-seed-5",
     resumeFormat: "company",
     status: "Under review",
@@ -105,8 +116,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-6",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-3",
+    candidate: { id: "cand-3", name: "Sasithorn Chai", initials: "SC", headline: "CS Graduate · Mahidol University", email: "sasithorn.chai@example.com" },
     resumeDraftId: "draft-seed-6",
     resumeFormat: "company",
     status: "Interview",
@@ -125,8 +137,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-7",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-4",
+    candidate: { id: "cand-4", name: "Thanawat Boonmee", initials: "TB", headline: "Web Developer · Freelance", email: "thanawat.boonmee@example.com" },
     resumeDraftId: "draft-seed-7",
     resumeFormat: "company",
     status: "Under review",
@@ -144,8 +157,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-8",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-5",
+    candidate: { id: "cand-5", name: "Napat Rattana", initials: "NR", headline: "UI Designer · Cobalt Studio", email: "napat.rattana@example.com" },
     resumeDraftId: "draft-seed-8",
     resumeFormat: "company",
     status: "Submitted",
@@ -160,8 +174,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-9",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-6",
+    candidate: { id: "cand-6", name: "Warisa Petch", initials: "WP", headline: "QA Engineer · Harbor Fintech", email: "warisa.petch@example.com" },
     resumeDraftId: "draft-seed-9",
     resumeFormat: "company",
     status: "Under review",
@@ -179,8 +194,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-10",
-    jobId: "job-frontend",
+    jobId: "job_seed_frontend",
     candidateId: "cand-7",
+    candidate: { id: "cand-7", name: "Chayut Srisai", initials: "CS", headline: "Backend Developer · Atlas Logistics", email: "chayut.srisai@example.com" },
     resumeDraftId: "draft-seed-10",
     resumeFormat: "company",
     status: "Rejected",
@@ -201,8 +217,9 @@ export const applications: Application[] = [
   // --- Brightline Backend Engineer (Node.js) applicants ---
   {
     id: "app-11",
-    jobId: "job-backend",
+    jobId: "job_seed_backend",
     candidateId: "cand-7",
+    candidate: { id: "cand-7", name: "Chayut Srisai", initials: "CS", headline: "Backend Developer · Atlas Logistics", email: "chayut.srisai@example.com" },
     resumeDraftId: "draft-seed-11",
     resumeFormat: "company",
     status: "Interview",
@@ -221,8 +238,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-12",
-    jobId: "job-backend",
+    jobId: "job_seed_backend",
     candidateId: "cand-4",
+    candidate: { id: "cand-4", name: "Thanawat Boonmee", initials: "TB", headline: "Web Developer · Freelance", email: "thanawat.boonmee@example.com" },
     resumeDraftId: "draft-seed-12",
     resumeFormat: "company",
     status: "Under review",
@@ -240,8 +258,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-13",
-    jobId: "job-backend",
+    jobId: "job_seed_backend",
     candidateId: "cand-3",
+    candidate: { id: "cand-3", name: "Sasithorn Chai", initials: "SC", headline: "CS Graduate · Mahidol University", email: "sasithorn.chai@example.com" },
     resumeDraftId: "draft-seed-13",
     resumeFormat: "company",
     status: "Submitted",
@@ -258,8 +277,9 @@ export const applications: Application[] = [
   // --- Brightline Data Analyst applicants ---
   {
     id: "app-14",
-    jobId: "job-data-analyst",
+    jobId: "job_seed_data_analyst",
     candidateId: "cand-5",
+    candidate: { id: "cand-5", name: "Napat Rattana", initials: "NR", headline: "UI Designer · Cobalt Studio", email: "napat.rattana@example.com" },
     resumeDraftId: "draft-seed-14",
     resumeFormat: "personal",
     status: "Rejected",
@@ -278,8 +298,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-15",
-    jobId: "job-data-analyst",
+    jobId: "job_seed_data_analyst",
     candidateId: "cand-6",
+    candidate: { id: "cand-6", name: "Warisa Petch", initials: "WP", headline: "QA Engineer · Harbor Fintech", email: "warisa.petch@example.com" },
     resumeDraftId: "draft-seed-15",
     resumeFormat: "personal",
     status: "Under review",
@@ -299,8 +320,9 @@ export const applications: Application[] = [
   // --- Brightline UX Designer applicants ---
   {
     id: "app-16",
-    jobId: "job-ux-designer",
+    jobId: "job_seed_ux_designer",
     candidateId: "cand-5",
+    candidate: { id: "cand-5", name: "Napat Rattana", initials: "NR", headline: "UI Designer · Cobalt Studio", email: "napat.rattana@example.com" },
     resumeDraftId: "draft-seed-16",
     resumeFormat: "personal",
     status: "Interview",
@@ -319,8 +341,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-17",
-    jobId: "job-ux-designer",
+    jobId: "job_seed_ux_designer",
     candidateId: "cand-2",
+    candidate: { id: "cand-2", name: "Kittipat Wongsa", initials: "KW", headline: "Junior Developer · Nova Systems", email: "kittipat.wongsa@example.com" },
     resumeDraftId: "draft-seed-17",
     resumeFormat: "personal",
     status: "Rejected",
@@ -339,8 +362,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-18",
-    jobId: "job-ux-designer",
+    jobId: "job_seed_ux_designer",
     candidateId: "cand-4",
+    candidate: { id: "cand-4", name: "Thanawat Boonmee", initials: "TB", headline: "Web Developer · Freelance", email: "thanawat.boonmee@example.com" },
     resumeDraftId: "draft-seed-18",
     resumeFormat: "personal",
     status: "Under review",
@@ -360,8 +384,9 @@ export const applications: Application[] = [
   // --- Brightline DevOps Engineer applicants (Closed job) ---
   {
     id: "app-19",
-    jobId: "job-devops",
+    jobId: "job_seed_devops",
     candidateId: "cand-7",
+    candidate: { id: "cand-7", name: "Chayut Srisai", initials: "CS", headline: "Backend Developer · Atlas Logistics", email: "chayut.srisai@example.com" },
     resumeDraftId: "draft-seed-19",
     resumeFormat: "company",
     status: "Rejected",
@@ -380,8 +405,9 @@ export const applications: Application[] = [
   },
   {
     id: "app-20",
-    jobId: "job-devops",
+    jobId: "job_seed_devops",
     candidateId: "cand-3",
+    candidate: { id: "cand-3", name: "Sasithorn Chai", initials: "SC", headline: "CS Graduate · Mahidol University", email: "sasithorn.chai@example.com" },
     resumeDraftId: "draft-seed-20",
     resumeFormat: "company",
     status: "Rejected",

@@ -18,7 +18,7 @@ import {
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAsync } from "@/lib/use-async";
 import { useRole } from "@/lib/auth/role-context";
-import { jobPosting, CURRENT_COMPANY_ID } from "@/lib/api";
+import { jobPosting } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -78,8 +78,8 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
 }
 
 function WorkspaceCard() {
-  const jobsState = useAsync(() => jobPosting.listJobs({ companyId: CURRENT_COMPANY_ID }), []);
-  const company = jobsState.data?.[0]?.company;
+  const companyState = useAsync(() => jobPosting.getRecruiterCompany(), []);
+  const company = companyState.data;
 
   return (
     <div className="flex items-center gap-3 rounded-xl border p-3">

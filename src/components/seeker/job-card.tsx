@@ -8,11 +8,14 @@ import { CompanyAvatar } from "@/components/brand/company-avatar";
 import { MatchBadge } from "@/components/brand/match-badge";
 import { MatchRing } from "@/components/brand/match-ring";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { cn, formatSalary, relativeDays } from "@/lib/utils";
+import { EMPLOYMENT_TYPE_LABEL, WORK_ARRANGEMENT_LABEL, formatLocation, formatSalary } from "@/lib/labels";
+import { cn, relativeDays } from "@/lib/utils";
 import type { JobWithMatch } from "@/lib/types";
 
 export function JobCard({ job }: { job: JobWithMatch }) {
   const [saved, setSaved] = useState(false);
+  const salary = formatSalary(job.salary);
+  const place = [formatLocation(job.location), job.workArrangement && WORK_ARRANGEMENT_LABEL[job.workArrangement]].filter(Boolean).join(" · ");
 
   function toggleSave() {
     setSaved((prev) => {
@@ -35,23 +38,27 @@ export function JobCard({ job }: { job: JobWithMatch }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4.5 gap-y-1.5 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <MapPin className="size-4" aria-hidden />
-            {job.location} · {job.arrangement}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Briefcase className="size-4" aria-hidden />
-            {job.employmentType}
-          </span>
-          <span className="font-semibold text-foreground">{formatSalary(job.salaryMin, job.salaryMax)}</span>
+          {place && (
+            <span className="flex items-center gap-1.5">
+              <MapPin className="size-4" aria-hidden />
+              {place}
+            </span>
+          )}
+          {job.employmentType && (
+            <span className="flex items-center gap-1.5">
+              <Briefcase className="size-4" aria-hidden />
+              {EMPLOYMENT_TYPE_LABEL[job.employmentType]}
+            </span>
+          )}
+          {salary && <span className="font-semibold text-foreground">{salary}</span>}
           <span className="flex items-center gap-1.5">
             <Clock className="size-4" aria-hidden />
-            {relativeDays(job.postedAt)}
+            {relativeDays(job.publishedAt ?? job.createdAt)}
           </span>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {job.requiredSkills.map((skill) => {
+          {job.requirements.requiredSkills.map(({ name: skill }) => {
             const have = job.match.matchedSkills.includes(skill);
             return (
               <span

@@ -1,47 +1,70 @@
 "use client";
 
-import { useState } from "react";
-import type { ChangeEvent, DragEvent } from "react";
+import { useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Info, Loader2, Pencil, Upload } from "lucide-react";
-import { ProfileSections } from "@/components/seeker/profile-sections";
+import { AlertTriangle, CheckCircle2, FileUp, Info, Loader2, PenLine, Upload } from "lucide-react";
 import { ErrorState, ListSkeleton } from "@/components/brand/page-states";
+import { ProfileDocumentEditor } from "@/components/seeker/profile/document-editor";
+import { BasicsFields } from "@/components/seeker/profile/fields";
+import {
+  BasicsCard,
+  DangerZone,
+  EducationCard,
+  ExperienceCard,
+  PreferencesCard,
+  ProjectsCard,
+  SkillsCard,
+  SummaryCard,
+} from "@/components/seeker/profile/live-cards";
+import { EditorActions, SectionCard } from "@/components/seeker/profile/shared";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useAsync } from "@/lib/use-async";
 import { candidateProfile } from "@/lib/api";
+import { ApiError, type FieldError } from "@/lib/api/errors";
+import { scopeErrors } from "@/lib/field-errors";
+import { emptyProfileDocument, profileCompleteness, profileInitials } from "@/lib/profile";
+import type { ProfileBasics, ProfileDocument } from "@/lib/types";
+import { useAsync } from "@/lib/use-async";
 import { cn } from "@/lib/utils";
-import type { CandidateProfile } from "@/lib/types";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_FILE_RE = /\.(pdf|docx?)$/i;
 
-type Mode = "view" | "import" | "review" | "edit";
+type Mode = "view" | "create" | "import" | "review";
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Please try again.");
 
 export default function ProfilePage() {
   const profileState = useAsync(() => candidateProfile.getProfile(), []);
+  const profile = profileState.data;
 
   const [mode, setMode] = useState<Mode>("view");
-  const [draft, setDraft] = useState<CandidateProfile>();
-  const [extractedFileName, setExtractedFileName] = useState<string>();
   const [importing, setImporting] = useState(false);
   const [fileError, setFileError] = useState<string>();
   const [dragOver, setDragOver] = useState(false);
+  const [doc, setDoc] = useState<ProfileDocument>();
+  const [extractedFileName, setExtractedFileName] = useState<string>();
+  const [docErrors, setDocErrors] = useState<FieldError[]>();
   const [saving, setSaving] = useState(false);
 
-  function startEdit() {
-    if (!profileState.data) return;
-    setDraft({ ...profileState.data });
-    setMode("edit");
+  /** Re-reads the profile without showing the loading skeleton. */
+  async function refresh() {
+    try {
+      profileState.setData(await candidateProfile.getProfile());
+    } catch (e) {
+      toast.error(errorText(e));
+    }
   }
 
-  function cancel() {
+  function backToView() {
     setMode("view");
-    setDraft(undefined);
-    setExtractedFileName(undefined);
+    setDoc(undefined);
+    setDocErrors(undefined);
     setFileError(undefined);
     setDragOver(false);
   }
+
+  // --- import -> review -> confirm ---
 
   async function handleFile(file: File) {
     setFileError(undefined);
@@ -56,17 +79,12 @@ export default function ProfilePage() {
     setImporting(true);
     try {
       const extracted = await candidateProfile.importResume(file);
-      const base = profileState.data;
-      setDraft({
-        id: base?.id ?? "temp",
-        verified: base?.verified ?? false,
-        completeness: base?.completeness ?? 0,
-        ...extracted.profile,
-      });
+      setDoc(extracted.profile);
       setExtractedFileName(extracted.fileName);
+      setDocErrors(undefined);
       setMode("review");
     } catch (e) {
-      setFileError(e instanceof Error ? e.message : "Couldn't read this file. Try again.");
+      setFileError(errorText(e));
     } finally {
       setImporting(false);
     }
@@ -85,93 +103,70 @@ export default function ProfilePage() {
     if (file) void handleFile(file);
   }
 
-  async function confirmExtracted() {
-    if (!draft) return;
+  async function confirmDocument() {
+    if (!doc) return;
     setSaving(true);
+    setDocErrors(undefined);
     try {
-      const saved = await candidateProfile.confirmExtractedProfile(draft);
+      const saved = await candidateProfile.confirmProfile({
+        ...doc,
+        links: doc.links.filter((l) => l.trim()),
+        experience: doc.experience.map((x) => ({ ...x, bullets: x.bullets.filter((b) => b.trim()) })),
+        projects: doc.projects.map((x) => ({ ...x, bullets: x.bullets.filter((b) => b.trim()) })),
+      });
       profileState.setData(saved);
       toast.success("Profile confirmed");
-      cancel();
+      backToView();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save your profile.");
+      if (e instanceof ApiError && e.fieldErrors?.length) {
+        setDocErrors(e.fieldErrors);
+        toast.error("Some fields need fixing before you can save.");
+      } else {
+        toast.error(errorText(e));
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  async function saveEdits() {
-    if (!draft) return;
+  // --- start from scratch ---
+
+  const [basics, setBasics] = useState<Omit<ProfileBasics, "summary">>(emptyProfileDocument());
+  const [basicsErrors, setBasicsErrors] = useState<FieldError[]>();
+
+  async function createFromScratch(e: FormEvent) {
+    e.preventDefault();
     setSaving(true);
+    setBasicsErrors(undefined);
     try {
-      const saved = await candidateProfile.updateProfile(draft);
+      const saved = await candidateProfile.createProfile({ ...basics, links: basics.links.filter((l) => l.trim()) });
       profileState.setData(saved);
-      toast.success("Profile saved");
-      cancel();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save your profile.");
+      toast.success("Profile created");
+      backToView();
+    } catch (err) {
+      if (err instanceof ApiError && err.fieldErrors?.length) setBasicsErrors(err.fieldErrors);
+      else toast.error(errorText(err));
     } finally {
       setSaving(false);
     }
   }
 
-  if (profileState.loading) {
-    return <ListSkeleton rows={4} />;
-  }
-  if (profileState.error || !profileState.data) {
-    return <ErrorState message={profileState.error?.message ?? "Profile not found"} onRetry={profileState.reload} />;
-  }
+  // --- render ---
 
-  const profile = profileState.data;
+  if (profileState.loading) return <ListSkeleton rows={4} />;
+  if (profileState.error) return <ErrorState message={profileState.error.message} onRetry={profileState.reload} />;
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-[28px]">My profile</h1>
-        <p className="text-[15px] text-muted-foreground">Keep your profile current so job matches stay accurate.</p>
-      </div>
+  const header = (
+    <div className="flex flex-col gap-1">
+      <h1 className="text-2xl font-extrabold tracking-tight sm:text-[28px]">My profile</h1>
+      <p className="text-[15px] text-muted-foreground">Keep your profile current so job matches stay accurate.</p>
+    </div>
+  );
 
-      {mode === "view" && (
-        <>
-          <div className="flex flex-col gap-5 rounded-2xl border bg-card p-6 md:flex-row md:items-center md:justify-between md:p-7">
-            <div className="flex items-center gap-4">
-              <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-xl font-bold text-primary-soft-foreground">
-                {profile.initials}
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-extrabold tracking-tight text-foreground">{profile.name}</h2>
-                  {profile.verified && (
-                    <span className="flex items-center gap-1.5 rounded-full bg-match-strong-soft px-2.5 py-1 text-xs font-bold text-match-strong">
-                      <CheckCircle2 className="size-3.5" aria-hidden />
-                      Verified
-                    </span>
-                  )}
-                </div>
-                <p className="text-[15px] text-muted-foreground">{profile.headline}</p>
-                <div className="flex items-center gap-2.5 pt-1">
-                  <Progress value={profile.completeness} className="w-40" aria-label="Profile completeness" />
-                  <span className="text-sm font-semibold text-muted-foreground">{profile.completeness}% complete</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" size="lg" onClick={() => setMode("import")}>
-                <Upload className="size-4" aria-hidden />
-                Import from resume
-              </Button>
-              <Button type="button" size="lg" onClick={startEdit}>
-                <Pencil className="size-4" aria-hidden />
-                Edit profile
-              </Button>
-            </div>
-          </div>
-
-          <ProfileSections profile={profile} />
-        </>
-      )}
-
-      {mode === "import" && (
+  if (mode === "import") {
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
         <div className="flex flex-col gap-5 rounded-2xl border bg-card p-6 md:p-8">
           <div className="flex flex-col items-center gap-1.5 text-center">
             <h2 className="text-lg font-bold">Import from resume</h2>
@@ -179,7 +174,6 @@ export default function ProfilePage() {
               Upload your resume and we&apos;ll pre-fill your profile. You&apos;ll review every detail before anything is saved.
             </p>
           </div>
-
           {importing ? (
             <div role="status" className="flex flex-col items-center gap-3 py-12 text-[15px] font-semibold text-muted-foreground">
               <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
@@ -195,7 +189,7 @@ export default function ProfilePage() {
               onDragLeave={() => setDragOver(false)}
               className={cn(
                 "flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
-                dragOver ? "border-primary bg-primary-soft" : "border-input bg-muted/30 hover:bg-muted/50"
+                dragOver ? "border-primary bg-primary-soft" : "border-input bg-muted/30 hover:bg-muted/50",
               )}
             >
               <span className="flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground">
@@ -206,58 +200,131 @@ export default function ProfilePage() {
               <input type="file" accept=".pdf,.doc,.docx" className="sr-only" onChange={onFileInputChange} />
             </label>
           )}
-
           {fileError && (
             <p role="alert" className="text-sm font-medium text-destructive">
               {fileError}
             </p>
           )}
-
           <div className="flex justify-center">
-            <Button type="button" variant="outline" size="lg" onClick={cancel} disabled={importing}>
+            <Button type="button" variant="outline" size="lg" onClick={backToView} disabled={importing}>
               Cancel
             </Button>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {mode === "review" && draft && (
-        <div className="flex flex-col gap-5">
-          <div role="status" className="flex items-start gap-3 rounded-2xl border border-info/30 bg-info-soft px-5 py-4 text-[15px] text-info">
-            <Info className="mt-0.5 size-5 shrink-0" aria-hidden />
-            <span>
-              We extracted this from <strong className="font-bold">{extractedFileName}</strong>. Check every detail — only confirmed
-              information is used for matching and resumes.
-            </span>
+  if (mode === "review" && doc) {
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
+        <div role="status" className="flex items-start gap-3 rounded-2xl border border-info/30 bg-info-soft px-5 py-4 text-[15px] text-info">
+          <Info className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <span>
+            We extracted this from <strong className="font-bold">{extractedFileName}</strong>. Check every detail — only confirmed information is
+            used for matching and resumes.
+          </span>
+        </div>
+        {profile && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl border border-match-good/40 bg-match-good-soft px-5 py-4 text-[15px] text-match-good">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden />
+            <span>Confirming replaces your current profile, including every skill, experience, education and project entry.</span>
           </div>
+        )}
+        <ProfileDocumentEditor doc={doc} onChange={setDoc} fieldErrors={docErrors} />
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" size="lg" onClick={() => void confirmDocument()} disabled={saving}>
+            {saving ? "Saving…" : "Confirm and save"}
+          </Button>
+          <Button type="button" variant="outline" size="lg" onClick={backToView} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-          <ProfileSections profile={draft} editable onChange={setDraft} />
-
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" size="lg" onClick={confirmExtracted} disabled={saving}>
-              {saving ? "Saving…" : "Confirm and save"}
+  if (!profile) {
+    if (mode === "create") {
+      return (
+        <div className="flex flex-col gap-6">
+          {header}
+          <SectionCard title="Start your profile">
+            <form onSubmit={createFromScratch} className="flex flex-col gap-4" noValidate>
+              <p className="text-sm text-muted-foreground">Start with the basics. You can add skills, experience and more next.</p>
+              <BasicsFields value={basics} onChange={setBasics} errors={scopeErrors(basicsErrors)} />
+              <EditorActions saving={saving} onCancel={backToView} saveLabel="Create profile" />
+            </form>
+          </SectionCard>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
+        <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed bg-card px-6 py-14 text-center">
+          <h2 className="text-lg font-bold">You don&apos;t have a profile yet</h2>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Your profile powers job matches and tailored resumes. Upload a resume to fill it in quickly, or start from scratch.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button type="button" size="lg" onClick={() => setMode("import")}>
+              <FileUp className="size-4" aria-hidden />
+              Upload resume
             </Button>
-            <Button type="button" variant="outline" size="lg" onClick={cancel} disabled={saving}>
-              Cancel
+            <Button type="button" variant="outline" size="lg" onClick={() => setMode("create")}>
+              <PenLine className="size-4" aria-hidden />
+              Start from scratch
             </Button>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {mode === "edit" && draft && (
-        <div className="flex flex-col gap-5">
-          <ProfileSections profile={draft} editable onChange={setDraft} />
+  const completeness = profileCompleteness(profile);
 
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" size="lg" onClick={saveEdits} disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-            <Button type="button" variant="outline" size="lg" onClick={cancel} disabled={saving}>
-              Cancel
-            </Button>
+  return (
+    <div className="flex flex-col gap-6">
+      {header}
+
+      <div className="flex flex-col gap-5 rounded-2xl border bg-card p-6 md:flex-row md:items-center md:justify-between md:p-7">
+        <div className="flex items-center gap-4">
+          <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-xl font-bold text-primary-soft-foreground">
+            {profileInitials(profile.name)}
+          </span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-extrabold tracking-tight text-foreground">{profile.name}</h2>
+              {profile.verified && (
+                <span className="flex items-center gap-1.5 rounded-full bg-match-strong-soft px-2.5 py-1 text-xs font-bold text-match-strong">
+                  <CheckCircle2 className="size-3.5" aria-hidden />
+                  Verified
+                </span>
+              )}
+            </div>
+            {profile.headline && <p className="text-[15px] text-muted-foreground">{profile.headline}</p>}
+            <div className="flex items-center gap-2.5 pt-1">
+              <Progress value={completeness} className="w-40" aria-label="Profile completeness" />
+              <span className="text-sm font-semibold text-muted-foreground">{completeness}% complete</span>
+            </div>
           </div>
         </div>
-      )}
+        <Button type="button" variant="outline" size="lg" onClick={() => setMode("import")}>
+          <Upload className="size-4" aria-hidden />
+          Import from resume
+        </Button>
+      </div>
+
+      <BasicsCard profile={profile} onSaved={profileState.setData} />
+      <SummaryCard profile={profile} onSaved={profileState.setData} />
+      <SkillsCard skills={profile.skills} onChanged={refresh} />
+      <ExperienceCard items={profile.experience} onChanged={refresh} />
+      <ProjectsCard items={profile.projects} onChanged={refresh} />
+      <EducationCard items={profile.education} onChanged={refresh} />
+      <PreferencesCard preferences={profile.preferences} onChanged={refresh} />
+      <DangerZone onDeleted={() => profileState.setData(null)} />
     </div>
   );
 }
