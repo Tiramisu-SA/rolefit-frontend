@@ -1,66 +1,74 @@
-import type { Job, JobInput, JobStatus, JobWithCompany } from "@/lib/types";
-import { CURRENT_COMPANY_ID, MockApiError, newId, nowIso, simulate, store, withCompany } from "./_store";
+import { companyFor } from "@/lib/companies";
+import type { Company, JobPosting, JobPostingInput, JobStatus, JobWithCompany, ResumeTemplateInfo } from "@/lib/types";
+import { unwrap } from "./errors";
+import * as actions from "./job-posting-actions";
 
-function find(id: string): Job {
-  const job = store.jobs.find((j) => j.id === id);
-  if (!job) throw new MockApiError("Job not found");
-  return job;
+// What pages call for jobs. Each function runs a Server Action (the Next.js
+// server calls the Job Posting Service over gRPC), throws ApiError on failure,
+// and attaches the company display details.
+// Note: Server Actions run one at a time per browser tab.
+
+const withCompany = (job: JobPosting): JobWithCompany => ({ ...job, company: companyFor(job.companyId) });
+
+// --- recruiter ---
+
+export async function listMyJobs(opts: { status?: JobStatus; query?: string } = {}): Promise<JobWithCompany[]> {
+  return unwrap(await actions.listMyJobsAction(opts)).map(withCompany);
 }
 
-function setStatus(id: string, status: JobStatus) {
-  return simulate(() => {
-    const job = find(id);
-    job.status = status;
-    return withCompany(job);
-  });
+export async function getMyJob(id: string): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.getMyJobAction(id)));
 }
 
-export function getJob(id: string): Promise<JobWithCompany> {
-  return simulate(() => withCompany(find(id)));
+export async function createJob(input: JobPostingInput): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.createJobAction(input)));
 }
 
-/** listJobs({ companyId }) for recruiters; listJobs({ status: "Published" }) for discovery. */
-export function listJobs(opts: { companyId?: string; status?: JobStatus } = {}): Promise<JobWithCompany[]> {
-  return simulate(() =>
-    store.jobs
-      .filter((j) => (opts.companyId ? j.companyId === opts.companyId : true))
-      .filter((j) => (opts.status ? j.status === opts.status : true))
-      .sort((a, b) => b.postedAt.localeCompare(a.postedAt))
-      .map(withCompany),
-  );
+export async function updateJob(id: string, input: JobPostingInput): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.updateJobAction(id, input)));
 }
 
-export function createJob(input: JobInput): Promise<JobWithCompany> {
-  return simulate(() => {
-    const job: Job = { ...input, id: newId("job"), companyId: CURRENT_COMPANY_ID, postedAt: nowIso(), status: "Draft" };
-    store.jobs.push(job);
-    return withCompany(job);
-  });
+export async function deleteJob(id: string): Promise<void> {
+  unwrap(await actions.deleteJobAction(id));
 }
 
-export function updateJob(id: string, input: Partial<JobInput>): Promise<JobWithCompany> {
-  return simulate(() => {
-    const job = find(id);
-    Object.assign(job, input);
-    return withCompany(job);
-  });
+export async function publishJob(id: string): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.publishJobAction(id)));
 }
 
-export const publishJob = (id: string) => setStatus(id, "Published");
-export const closeJob = (id: string) => setStatus(id, "Closed");
-export const reopenJob = (id: string) => setStatus(id, "Published");
-
-export function attachResumeTemplate(id: string, file: File): Promise<JobWithCompany> {
-  return simulate(() => {
-    const job = find(id);
-    job.resumeTemplateName = file.name;
-    return withCompany(job);
-  });
+export async function closeJob(id: string): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.closeJobAction(id)));
 }
 
-export function getResumeTemplate(id: string): Promise<{ name: string } | null> {
-  return simulate(() => {
-    const job = find(id);
-    return job.resumeTemplateName ? { name: job.resumeTemplateName } : null;
-  });
+export async function reopenJob(id: string): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.reopenJobAction(id)));
+}
+
+export async function attachResumeTemplate(id: string, file: File): Promise<ResumeTemplateInfo> {
+  const formData = new FormData();
+  formData.set("file", file);
+  return unwrap(await actions.attachResumeTemplateAction(id, formData));
+}
+
+/** Metadata of the job's resume template, or null when it has none. */
+export async function getResumeTemplate(id: string): Promise<ResumeTemplateInfo | null> {
+  return unwrap(await actions.getResumeTemplateAction(id));
+}
+
+export async function deleteResumeTemplate(id: string): Promise<void> {
+  unwrap(await actions.deleteResumeTemplateAction(id));
+}
+
+export async function getRecruiterCompany(): Promise<Company> {
+  return unwrap(await actions.getRecruiterCompanyAction());
+}
+
+// --- seeker / public ---
+
+export async function listOpenJobs(opts: { query?: string } = {}): Promise<JobWithCompany[]> {
+  return unwrap(await actions.listOpenJobsAction(opts)).map(withCompany);
+}
+
+export async function getJob(id: string): Promise<JobWithCompany> {
+  return withCompany(unwrap(await actions.getJobAction(id)));
 }
