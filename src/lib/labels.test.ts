@@ -8,6 +8,7 @@ import {
   experienceLevelFor,
   formatLocation,
   formatSalary,
+  requirementLines,
 } from "./labels";
 
 describe("enum labels", () => {
@@ -58,5 +59,38 @@ describe("formatSalary", () => {
 
   it("uses the currency code for currencies other than THB", () => {
     expect(formatSalary({ minimum: 3000, maximum: 4000, currency: "USD", visible: true })).toBe("USD 3,000 – 4,000 / mo");
+  });
+});
+
+describe("requirementLines", () => {
+  it("describes required skills, experience and education, and preferred skills", () => {
+    const lines = requirementLines({
+      requiredSkills: [
+        { name: "Python", level: "INTERMEDIATE", minimumYears: 1 },
+        { name: "PostgreSQL", level: "BASIC", minimumYears: 0 },
+      ],
+      preferredSkills: [{ name: "Docker", level: "BASIC" }],
+      minimumExperienceYears: 2,
+      educationLevel: "BACHELOR",
+      acceptedFields: ["Computer Engineering", "Computer Science", "Software Engineering"],
+    });
+    expect(lines.required).toEqual([
+      "Python · Intermediate · 1+ year",
+      "PostgreSQL · Basic",
+      "Experience: 2+ years",
+      "Education: Bachelor's degree in Computer Engineering, Computer Science or Software Engineering",
+    ]);
+    expect(lines.preferred).toEqual(["Docker · Basic"]);
+  });
+
+  it("leaves out experience and education when not required", () => {
+    const lines = requirementLines({
+      requiredSkills: [],
+      preferredSkills: [],
+      minimumExperienceYears: 0,
+      educationLevel: "NONE",
+      acceptedFields: [],
+    });
+    expect(lines).toEqual({ required: [], preferred: [] });
   });
 });

@@ -3,6 +3,7 @@ import type {
   EmploymentType,
   ExperienceLevel,
   JobLocation,
+  JobRequirements,
   JobSalary,
   JobStatus,
   SkillLevel,
@@ -67,4 +68,25 @@ export function formatSalary(salary: JobSalary): string | null {
   if (minimum !== undefined) return `${money(minimum)}+ / mo`;
   if (maximum !== undefined) return `Up to ${money(maximum)} / mo`;
   return "Salary not listed";
+}
+
+const years = (n: number) => `${n}+ ${n === 1 ? "year" : "years"}`;
+
+/** "A", "A or B", "A, B or C" */
+function joinOr(items: string[]): string {
+  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+}
+
+/** Human-readable requirement lines for a job page. */
+export function requirementLines(r: JobRequirements): { required: string[]; preferred: string[] } {
+  const required = r.requiredSkills.map((s) =>
+    [s.name, SKILL_LEVEL_LABEL[s.level], s.minimumYears > 0 ? years(s.minimumYears) : ""].filter(Boolean).join(" · "),
+  );
+  if (r.minimumExperienceYears > 0) required.push(`Experience: ${years(r.minimumExperienceYears)}`);
+  if (r.educationLevel !== "NONE") {
+    const fields = r.acceptedFields.length ? ` in ${joinOr(r.acceptedFields)}` : "";
+    required.push(`Education: ${EDUCATION_LEVEL_LABEL[r.educationLevel]}${fields}`);
+  }
+  const preferred = r.preferredSkills.map((s) => `${s.name} · ${SKILL_LEVEL_LABEL[s.level]}`);
+  return { required, preferred };
 }
