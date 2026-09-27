@@ -44,20 +44,3 @@ export function emptyProfileDocument(): ProfileDocument {
     preferences: null,
   };
 }
-
-/** A saved profile as a confirm-able document (drops ids and server-owned fields). */
-export function toProfileDocument(p: CandidateProfile): ProfileDocument {
-  return {
-    name: p.name,
-    headline: p.headline,
-    summary: p.summary,
-    email: p.email,
-    location: p.location,
-    links: p.links,
-    skills: p.skills.map(({ id: _id, ...rest }) => rest),
-    experience: p.experience.map(({ id: _id, ...rest }) => rest),
-    education: p.education.map(({ id: _id, ...rest }) => rest),
-    projects: p.projects.map(({ id: _id, ...rest }) => rest),
-    preferences: p.preferences,
-  };
-}
