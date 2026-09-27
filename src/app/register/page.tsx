@@ -42,7 +42,7 @@ interface Errors {
 function RegisterPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { signIn } = useRole();
+  const { signUp } = useRole();
   const initialRole: Role = searchParams.get("role") === "recruiter" ? "recruiter" : "seeker";
   const [role, setRole] = useState<Role>(initialRole);
   const [name, setName] = useState("");
@@ -50,9 +50,10 @@ function RegisterPageInner() {
   const [password, setPassword] = useState("");
   const [company, setCompany] = useState("");
   const [errors, setErrors] = useState<Errors>({});
+  const [submitting, setSubmitting] = useState(false);
   const copy = COPY[role];
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const nextErrors: Errors = {};
     if (!name.trim()) nextErrors.name = "Enter your full name.";
@@ -62,7 +63,19 @@ function RegisterPageInner() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    signIn(role, name);
+    setSubmitting(true);
+    const error = await signUp({
+      role,
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      company: role === "recruiter" ? company.trim() : undefined,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
     toast.success("Account created");
     router.push(role === "seeker" ? "/seeker/profile" : "/recruiter/dashboard");
   }
@@ -180,13 +193,11 @@ function RegisterPageInner() {
               )}
             </div>
 
-            <Button type="submit" size="lg" className="w-full">
-              {copy.submitLabel}
+            <Button type="submit" size="lg" className="w-full" disabled={submitting}>
+              {submitting ? "Creating account…" : copy.submitLabel}
               <ArrowRight className="size-4.5" aria-hidden />
             </Button>
           </form>
-
-          <p className="text-center text-sm text-muted-foreground">Demo mode: any details will work, nothing is sent anywhere.</p>
 
           <p className="text-center text-[15px] text-muted-foreground">
             Already have an account?{" "}
