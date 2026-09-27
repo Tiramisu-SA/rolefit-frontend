@@ -10,15 +10,16 @@ import { StatusBadge } from "@/components/brand/status-badge";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/brand/page-states";
 import { useAsync } from "@/lib/use-async";
 import { useRole } from "@/lib/auth/role-context";
-import { jobPosting, applicationService, CURRENT_COMPANY_ID } from "@/lib/api";
+import { jobPosting, applicationService } from "@/lib/api";
+import { formatLocation } from "@/lib/labels";
 import { formatDate } from "@/lib/utils";
 import type { ApplicationView, JobWithCompany } from "@/lib/types";
 
 const CLOSING_SOON_WINDOW_DAYS = 21;
 
 async function loadRecentApplicants(): Promise<ApplicationView[]> {
-  const jobs = await jobPosting.listJobs({ companyId: CURRENT_COMPANY_ID });
-  const lists = await Promise.all(jobs.map((job) => applicationService.listApplicantsForJob(job.id)));
+  const jobs = await jobPosting.listMyJobs();
+  const lists = await Promise.all(jobs.map((job) => applicationService.listApplicantsForJob(job)));
   return lists
     .flat()
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
@@ -29,11 +30,16 @@ function daysUntil(iso: string, now: Date): number {
   return Math.floor((new Date(iso).getTime() - now.getTime()) / 86_400_000);
 }
 
+const deadlineOf = (job: JobWithCompany) => job.applicationSettings.applicationDeadline;
+
 function closingSoonJobs(jobs: JobWithCompany[]): JobWithCompany[] {
   const now = new Date();
   return jobs
-    .filter((job) => job.status === "Published" && job.deadline && daysUntil(job.deadline, now) >= 0 && daysUntil(job.deadline, now) <= CLOSING_SOON_WINDOW_DAYS)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+    .filter((job) => {
+      const deadline = deadlineOf(job);
+      return job.status === "OPEN" && !!deadline && daysUntil(deadline, now) >= 0 && daysUntil(deadline, now) <= CLOSING_SOON_WINDOW_DAYS;
+    })
+    .sort((a, b) => new Date(deadlineOf(a)!).getTime() - new Date(deadlineOf(b)!).getTime());
 }
 
 export default function RecruiterDashboardPage() {
@@ -111,20 +117,18 @@ export default function RecruiterDashboardPage() {
           ) : rowsState.error ? (
             <ErrorState message={rowsState.error.message} onRetry={rowsState.reload} />
           ) : closingSoon.length === 0 ? (
-            <EmptyState icon={CalendarClock} title="Nothing closing soon" description="No published postings have a deadline in the next 3 weeks." />
+            <EmptyState icon={CalendarClock} title="Nothing closing soon" description="No open postings have a deadline in the next 3 weeks." />
           ) : (
             <ul className="flex flex-col gap-2">
               {closingSoon.map((job) => (
                 <li key={job.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
                   <div className="flex min-w-0 flex-col gap-0.5">
-                    <Link href={`/recruiter/jobs/${job.id}/applicants`} className="truncate font-bold text-foreground hover:text-primary">
+                    <Link href={`/recruiter/jobs/${job.id}/edit`} className="truncate font-bold text-foreground hover:text-primary">
                       {job.title}
                     </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                      {job.team} · {job.location}
-                    </span>
+                    <span className="truncate text-sm text-muted-foreground">{formatLocation(job.location)}</span>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-foreground/80">Deadline {formatDate(job.deadline!)}</span>
+                  <span className="shrink-0 text-sm font-semibold text-foreground/80">Deadline {formatDate(deadlineOf(job)!)}</span>
                 </li>
               ))}
             </ul>

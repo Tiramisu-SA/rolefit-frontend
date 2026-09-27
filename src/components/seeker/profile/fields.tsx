@@ -20,7 +20,8 @@ import {
   type ProjectInput,
   type SkillLevel,
 } from "@/lib/types";
-import { FieldMessage, NativeSelect, fromMonthInput, fromMonthInputEnd, orNull, splitCommaList, toMonthInput } from "./shared";
+import { NativeSelect } from "@/components/ui/native-select";
+import { FieldMessage, fromMonthInput, fromMonthInputEnd, orNull, splitCommaList, toMonthInput } from "./shared";
 
 // Controlled form fields for one profile item. Used by the per-section cards
 // (saved profile) and by the document editor (reviewing an imported resume).

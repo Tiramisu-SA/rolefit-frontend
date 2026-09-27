@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRowKeys } from "@/lib/use-row-keys";
 import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,19 +27,6 @@ import { FieldMessage, SectionCard, orNull } from "./shared";
 
 // Edits a whole profile document locally (nothing is saved here). Used to
 // review what was extracted from an uploaded resume before confirming it.
-
-let nextKey = 0;
-const newKeys = (n: number) => Array.from({ length: n }, () => ++nextKey);
-
-/** Stable React keys for a list whose rows can be added and removed. */
-function useRowKeys(initialLength: number) {
-  const [keys, setKeys] = useState(() => newKeys(initialLength));
-  return {
-    keys,
-    add: () => setKeys((k) => [...k, ...newKeys(1)]),
-    remove: (index: number) => setKeys((k) => k.filter((_, i) => i !== index)),
-  };
-}
 
 function RowList<T>({
   title, noun, items, onChange, empty, fieldErrors, prefix, Fields,

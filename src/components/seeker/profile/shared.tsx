@@ -1,6 +1,5 @@
-import type { ReactNode, SelectHTMLAttributes } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const monthFmt = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -70,19 +69,6 @@ export function FieldMessage({ id, message }: { id?: string; message?: string })
     <p id={id} className="text-[13px] font-medium text-destructive">
       {message}
     </p>
-  );
-}
-
-/** A native select styled like the text inputs. */
-export function NativeSelect({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={cn(
-        "h-10 w-full rounded-lg border border-input bg-background px-3 text-[15px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive",
-        className,
-      )}
-      {...props}
-    />
   );
 }
 
