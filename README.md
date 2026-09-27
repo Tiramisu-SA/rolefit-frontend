@@ -23,12 +23,6 @@ DEV_RECRUITER_COMPANY_ID=co-brightline          # server only; matches the seede
 `NEXT_PUBLIC_*` values are built into the browser bundle: restart `npm run dev` (or rebuild) after changing them.
 Auth is mocked; the role switch on the login page only picks which area you see.
 
-## Run everything locally
-
-1. **Candidate Profile Service** (`../rolefit-candidate-profile-service`): apply `db/migrations/003_match_er_diagram.sql` once in the Supabase SQL Editor, set `CORS_ORIGIN=http://localhost:3000`, then `npm run dev`.
-2. **Job Posting Service** (`../rolefit-job-posting-service`): needs MongoDB (e.g. `docker run -d -p 27017:27017 mongo:7`). Set `HTTP_PORT=3002`, `GRPC_PORT=50052`, `MONGODB_URI`, then `npm run seed` (12 sample jobs) and `npm run dev`.
-3. **Frontend**: `npm install`, then `npm run dev` and open http://localhost:3000.
-
 ## Scripts
 
 | Command | What it does |
