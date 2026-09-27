@@ -44,7 +44,6 @@ const PREFS: CandidatePreferences = {
 function profile(overrides: Partial<CandidateProfile> = {}): CandidateProfile {
   return {
     id: "p1",
-    userId: "u1",
     name: "Pim",
     headline: null,
     summary: null,

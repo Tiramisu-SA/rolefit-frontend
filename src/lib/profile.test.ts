@@ -5,7 +5,6 @@ import type { CandidateProfile } from "./types";
 function profile(overrides: Partial<CandidateProfile> = {}): CandidateProfile {
   return {
     id: "p1",
-    userId: "u1",
     name: "Pimchanok Srisuk",
     headline: null,
     summary: null,

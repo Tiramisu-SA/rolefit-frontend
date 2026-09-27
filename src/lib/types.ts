@@ -174,8 +174,8 @@ export interface ProfileBasics {
 }
 
 export interface CandidateProfile extends ProfileBasics {
+  /** Also the owner's user id (the seeker's X-User-Id). */
   id: string;
-  userId: string;
   verified: boolean;
   totalExperienceMonths: number;
   skills: Skill[];
