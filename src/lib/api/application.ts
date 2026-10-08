@@ -1,8 +1,8 @@
-import { computeMatch } from "@/lib/match";
 import { profileInitials } from "@/lib/profile";
 import type { Application, ApplicationStatus, ApplicationView, JobWithCompany } from "@/lib/types";
 import * as candidateProfile from "./candidate-profile";
 import { ApiError } from "./errors";
+import * as jobDiscovery from "./job-discovery";
 import * as jobPosting from "./job-posting";
 import { SEEKER_ID, newId, nowIso, simulate, store } from "./_store";
 
@@ -33,7 +33,7 @@ export async function submitApplication(jobId: string): Promise<ApplicationView>
   const [job, profile] = await Promise.all([jobPosting.getJob(jobId), candidateProfile.getProfile()]);
   if (job.status !== "OPEN") throw new ApiError("JOB_NOT_OPEN", "This job is no longer accepting applications");
   if (!profile) throw new ApiError("PROFILE_REQUIRED", "Create your profile before applying");
-  const match = computeMatch(profile, job);
+  const match = await jobDiscovery.getMatchResult(jobId);
   return simulate(() => {
     const draft = store.resumeDrafts.find((r) => r.jobId === jobId && r.candidateId === SEEKER_ID && r.approved);
     if (!draft) throw new ApiError("RESUME_NOT_APPROVED", "Approve your resume before applying");

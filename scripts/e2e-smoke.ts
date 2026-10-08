@@ -1,10 +1,11 @@
 // End-to-end smoke test: drives the frontend's API modules against running services.
 //
-//   Candidate Profile Service (REST) + Job Posting Service (gRPC, seeded) must be running.
+//   Candidate Profile Service (REST) + Job Posting Service (gRPC, seeded) + Job Discovery
+//   Service (REST) must be running.
 //   npx tsx --conditions=react-server scripts/e2e-smoke.ts
 //
 // Env (defaults match the local dev setup):
-//   NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL, NEXT_PUBLIC_DEV_SEEKER_USER_ID,
+//   NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL, NEXT_PUBLIC_JOB_DISCOVERY_API_URL, NEXT_PUBLIC_DEV_SEEKER_USER_ID,
 //   JOB_POSTING_GRPC_URL, DEV_RECRUITER_USER_ID, DEV_RECRUITER_COMPANY_ID
 // It deletes the profile it creates. Its test job ends CLOSED (only drafts can be
 // deleted), so run it against a dev database, not one you care about.
@@ -12,6 +13,7 @@
 import { randomUUID } from "node:crypto";
 
 process.env.NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL ??= "http://localhost:3001";
+process.env.NEXT_PUBLIC_JOB_DISCOVERY_API_URL ??= "http://localhost:3002";
 process.env.NEXT_PUBLIC_DEV_SEEKER_USER_ID = randomUUID(); // a fresh seeker every run
 process.env.JOB_POSTING_GRPC_URL ??= "localhost:50052";
 process.env.DEV_RECRUITER_USER_ID ??= "user_4a80fdb2";
@@ -35,7 +37,7 @@ async function main() {
   const profile = await import("../src/lib/api/candidate-profile");
   const actions = await import("../src/lib/api/job-posting-actions");
   const { ApiError, unwrap } = await import("../src/lib/api/errors");
-  const { computeMatch } = await import("../src/lib/match");
+  const discovery = await import("../src/lib/api/job-discovery");
 
   const rejects = async (p: Promise<unknown>, code: string) => {
     try {
@@ -164,11 +166,22 @@ async function main() {
     });
     expect(!bad.ok && bad.error.fieldErrors?.[0]?.message.includes("ภาษาไทย"), JSON.stringify(bad));
   });
-  await step("match: real profile vs real job", async () => {
-    const p = (await profile.getProfile())!;
-    const job = unwrap(await actions.getJobAction(jobId));
-    const m = computeMatch(p, job);
-    expect(m.score > 0 && m.missingSkills.includes("Python"), JSON.stringify(m.breakdown));
+  // --- Job Discovery Service (REST; reads the two services above over gRPC) ---
+  await step("discovery: match real profile vs real job", async () => {
+    const m = await discovery.getMatchResult(jobId);
+    expect(m.score > 0 && m.missingSkills.includes("Python") && m.explanation !== "", JSON.stringify(m));
+  });
+  await step("discovery: fit, search and recommendations include the job", async () => {
+    const fit = await discovery.evaluateJobFit(jobId);
+    expect(fit.id === jobId && fit.company.id === fit.companyId, JSON.stringify(fit));
+    const found = await discovery.searchJobs({ query: fit.title });
+    expect(found.some((j) => j.id === jobId), `search for "${fit.title}" missed ${jobId}`);
+    const recs = await discovery.getRecommendations(100);
+    expect(recs.some((j) => j.id === jobId), "recommendations missed the job");
+    expect(recs.every((j, i) => i === 0 || recs[i - 1].match.score >= j.match.score), "not sorted by score");
+  });
+  await step("discovery: unknown job is 404", async () => {
+    await rejects(discovery.getMatchResult("job_does_not_exist"), "JOB_NOT_FOUND");
   });
 
   // --- clean up what this run created ---

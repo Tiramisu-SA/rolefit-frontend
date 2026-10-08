@@ -206,7 +206,7 @@ export interface ExtractedProfile {
   profile: ProfileDocument;
 }
 
-// --- Job Discovery (mock) -------------------------------------------------------
+// --- Job Discovery Service (REST) -----------------------------------------------
 
 export interface MatchBreakdown {
   skills: number;
