@@ -1,4 +1,3 @@
-import { seekerUserId } from "@/lib/identity";
 import type {
   CandidatePreferences,
   CandidateProfile,
@@ -14,58 +13,18 @@ import type {
   Skill,
   SkillInput,
 } from "@/lib/types";
-import { ApiError, type FieldError } from "./errors";
+import { ApiError } from "./errors";
+import { gatewayRequest } from "./gateway";
 
-// REST client for the Candidate Profile Service, called straight from the
-// browser. Every request carries the mock seeker identity (X-User-Id) and
-// works on that user's own profile (/api/profiles/me).
+// REST client for the Candidate Profile Service, reached through the API
+// Gateway (/api/candidates/* → the service's /api/*). Every route works on the
+// signed-in user's own profile (/profiles/me); the gateway tells the service who that is.
 
 const DOC = "application/msword";
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-function baseUrl(): string {
-  // Must be read as a literal so Next can inline it into the browser bundle.
-  const url = process.env.NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL;
-  if (!url) {
-    throw new ApiError("CONFIG_ERROR", "NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL is not set. Add it to .env.local and restart the dev server.");
-  }
-  return url.replace(/\/+$/, "");
-}
-
-interface ErrorBody {
-  error?: { code?: string; message?: string; details?: FieldError[] };
-}
-
-async function request<T>(method: string, path: string, init: { json?: unknown; body?: BodyInit; headers?: HeadersInit } = {}): Promise<T> {
-  const url = `${baseUrl()}/api/profiles${path}`;
-  const headers = new Headers(init.headers);
-  headers.set("X-User-Id", seekerUserId());
-  let body = init.body;
-  if (init.json !== undefined) {
-    headers.set("Content-Type", "application/json");
-    body = JSON.stringify(init.json);
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(url, { method, headers, body });
-  } catch {
-    throw new ApiError("SERVICE_UNAVAILABLE", "Can't reach the profile service. Please try again.", 503);
-  }
-
-  if (res.status === 204) return undefined as T;
-  const data = (await res.json().catch(() => null)) as unknown;
-  if (!res.ok) {
-    const err = (data as ErrorBody | null)?.error;
-    throw new ApiError(
-      err?.code ?? "INTERNAL",
-      err?.message ?? `The profile service returned an error (${res.status}).`,
-      res.status,
-      err?.details,
-    );
-  }
-  return data as T;
-}
+const request = <T>(method: string, path: string, init: { json?: unknown; body?: BodyInit; headers?: HeadersInit } = {}) =>
+  gatewayRequest<T>(method, `/api/candidates/profiles${path}`, { ...init, serviceName: "profile service" });
 
 // --- profile ---
 

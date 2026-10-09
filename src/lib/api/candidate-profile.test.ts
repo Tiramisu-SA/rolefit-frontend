@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as profileApi from "./candidate-profile";
 import { ApiError } from "./errors";
 
-const USER = "3f1c2b7e-9a4d-4c1e-8b2a-5d6e7f809a1b";
+const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
+vi.mock("@/lib/auth/supabase", () => ({ supabase: { auth: { getSession } } }));
+
 const fetchMock = vi.fn();
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -10,10 +12,10 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 beforeEach(() => {
-  vi.stubEnv("NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL", "http://localhost:3001");
-  vi.stubEnv("NEXT_PUBLIC_DEV_SEEKER_USER_ID", USER);
+  vi.stubEnv("NEXT_PUBLIC_API_GATEWAY_URL", "http://localhost:8080");
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
+  getSession.mockResolvedValue({ data: { session: { access_token: "test-token" } } });
 });
 
 afterEach(() => {
@@ -22,13 +24,15 @@ afterEach(() => {
 });
 
 describe("candidate profile client", () => {
-  it("sends X-User-Id and parses the JSON response", async () => {
+  it("calls the gateway with the access token and parses the JSON response", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { id: "p1", name: "Pim" }));
     const profile = await profileApi.getProfile();
     expect(profile).toEqual({ id: "p1", name: "Pim" });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:3001/api/profiles/me");
-    expect(new Headers(init.headers).get("X-User-Id")).toBe(USER);
+    expect(url).toBe("http://localhost:8080/api/candidates/profiles/me");
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBe("Bearer test-token");
+    expect(headers.has("X-User-Id")).toBe(false);
   });
 
   it("returns null from getProfile when there is no profile yet", async () => {
@@ -62,7 +66,7 @@ describe("candidate profile client", () => {
   it("resolves 204 responses to undefined", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     await expect(profileApi.deleteSkill("s1")).resolves.toBeUndefined();
-    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:3001/api/profiles/me/skills/s1");
+    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:8080/api/candidates/profiles/me/skills/s1");
     expect(fetchMock.mock.calls[0][1].method).toBe("DELETE");
   });
 
@@ -72,15 +76,15 @@ describe("candidate profile client", () => {
     const result = await profileApi.importResume(file);
     expect(result.fileName).toBe("ประวัติ.docx");
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:3001/api/profiles/me/import-resume");
+    expect(url).toBe("http://localhost:8080/api/candidates/profiles/me/import-resume");
     const headers = new Headers(init.headers);
     expect(headers.get("Content-Type")).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     expect(headers.get("X-File-Name")).toBe(encodeURIComponent("ประวัติ.docx"));
     expect(init.body).toBe(file);
   });
 
-  it("fails with a clear message when the service URL is not configured", async () => {
-    vi.stubEnv("NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL", "");
+  it("fails with a clear message when the gateway URL is not configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_GATEWAY_URL", "");
     await expect(profileApi.getProfile()).rejects.toMatchObject({ code: "CONFIG_ERROR" });
   });
 });

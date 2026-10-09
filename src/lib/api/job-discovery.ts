@@ -1,48 +1,13 @@
 import { companyFor } from "@/lib/companies";
-import { seekerUserId } from "@/lib/identity";
 import type { JobPosting, JobSearchFilters, JobWithMatch, MatchResult } from "@/lib/types";
-import { ApiError, type FieldError } from "./errors";
+import { gatewayRequest } from "./gateway";
 
-// REST client for the Job Discovery Service, called straight from the browser.
-// Every request carries the mock seeker identity (X-User-Id); the service reads
-// the seeker's profile and the open jobs over gRPC and does the matching.
+// REST client for the Job Discovery Service, reached through the API Gateway
+// (/api/discovery/* → the service's /api/*). The service reads the seeker's
+// profile and the open jobs over gRPC and does the matching.
 
-function baseUrl(): string {
-  // Must be read as a literal so Next can inline it into the browser bundle.
-  const url = process.env.NEXT_PUBLIC_JOB_DISCOVERY_API_URL;
-  if (!url) {
-    throw new ApiError("CONFIG_ERROR", "NEXT_PUBLIC_JOB_DISCOVERY_API_URL is not set. Add it to .env.local and restart the dev server.");
-  }
-  return url.replace(/\/+$/, "");
-}
-
-interface ErrorBody {
-  error?: { code?: string; message?: string; details?: FieldError[] };
-}
-
-async function get<T>(path: string, params?: URLSearchParams): Promise<T> {
-  const qs = params?.toString();
-  const url = `${baseUrl()}/api${path}${qs ? `?${qs}` : ""}`;
-
-  let res: Response;
-  try {
-    res = await fetch(url, { headers: { "X-User-Id": seekerUserId() } });
-  } catch {
-    throw new ApiError("SERVICE_UNAVAILABLE", "Can't reach the job discovery service. Please try again.", 503);
-  }
-
-  const data = (await res.json().catch(() => null)) as unknown;
-  if (!res.ok) {
-    const err = (data as ErrorBody | null)?.error;
-    throw new ApiError(
-      err?.code ?? "INTERNAL",
-      err?.message ?? `The job discovery service returned an error (${res.status}).`,
-      res.status,
-      err?.details,
-    );
-  }
-  return data as T;
-}
+const get = <T>(path: string, params?: URLSearchParams) =>
+  gatewayRequest<T>("GET", `/api/discovery${path}`, { query: params, serviceName: "job discovery service" });
 
 type JobPostingWithMatch = JobPosting & { match: MatchResult };
 

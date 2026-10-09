@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./errors";
 import * as discoveryApi from "./job-discovery";
 
-const USER = "3f1c2b7e-9a4d-4c1e-8b2a-5d6e7f809a1b";
+const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
+vi.mock("@/lib/auth/supabase", () => ({ supabase: { auth: { getSession } } }));
+
 const fetchMock = vi.fn();
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -12,10 +14,10 @@ function jsonResponse(status: number, body: unknown): Response {
 const job = { id: "job_1", companyId: "co-brightline", title: "Frontend Developer", match: { score: 80 } };
 
 beforeEach(() => {
-  vi.stubEnv("NEXT_PUBLIC_JOB_DISCOVERY_API_URL", "http://localhost:3002/");
-  vi.stubEnv("NEXT_PUBLIC_DEV_SEEKER_USER_ID", USER);
+  vi.stubEnv("NEXT_PUBLIC_API_GATEWAY_URL", "http://localhost:8080/");
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
+  getSession.mockResolvedValue({ data: { session: { access_token: "test-token" } } });
 });
 
 afterEach(() => {
@@ -24,7 +26,7 @@ afterEach(() => {
 });
 
 describe("job discovery client", () => {
-  it("sends filters as query parameters with X-User-Id and attaches the company", async () => {
+  it("sends filters as query parameters with the access token and attaches the company", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { jobs: [job] }));
     const jobs = await discoveryApi.searchJobs({
       query: " react ",
@@ -36,9 +38,9 @@ describe("job discovery client", () => {
     });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(
-      "http://localhost:3002/api/jobs/search?query=react&employmentTypes=FULL_TIME%2CCONTRACT&experienceLevels=Entry+level&minSalary=30000",
+      "http://localhost:8080/api/discovery/jobs/search?query=react&employmentTypes=FULL_TIME%2CCONTRACT&experienceLevels=Entry+level&minSalary=30000",
     );
-    expect(new Headers(init.headers).get("X-User-Id")).toBe(USER);
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
     expect(jobs[0].company.name).toBe("Brightline Analytics");
   });
 
@@ -48,9 +50,9 @@ describe("job discovery client", () => {
     const fit = await discoveryApi.evaluateJobFit("job_1");
     const match = await discoveryApi.getMatchResult("job_1");
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "http://localhost:3002/api/recommendations?limit=3",
-      "http://localhost:3002/api/jobs/job_1/fit",
-      "http://localhost:3002/api/jobs/job_1/match",
+      "http://localhost:8080/api/discovery/recommendations?limit=3",
+      "http://localhost:8080/api/discovery/jobs/job_1/fit",
+      "http://localhost:8080/api/discovery/jobs/job_1/match",
     ]);
     expect(fit.company.id).toBe("co-brightline");
     expect(match).toEqual({ score: 80 });
