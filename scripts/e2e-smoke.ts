@@ -1,23 +1,31 @@
-// End-to-end smoke test: drives the frontend's API modules against running services.
+// End-to-end smoke test: drives the frontend's API modules through the API Gateway.
 //
-//   Candidate Profile Service (REST) + Job Posting Service (gRPC, seeded) + Job Discovery
-//   Service (REST) must be running.
+//   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery must be running.
 //   npx tsx --conditions=react-server scripts/e2e-smoke.ts
 //
-// Env (defaults match the local dev setup):
-//   NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL, NEXT_PUBLIC_JOB_DISCOVERY_API_URL, NEXT_PUBLIC_DEV_SEEKER_USER_ID,
-//   JOB_POSTING_GRPC_URL, DEV_RECRUITER_USER_ID, DEV_RECRUITER_COMPANY_ID
-// It deletes the profile it creates. Its test job ends CLOSED (only drafts can be
+// Env (read from the environment, then .env.local / .env):
+//   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_API_GATEWAY_URL (default http://localhost:8080)
+//   SMOKE_SEEKER_EMAIL / SMOKE_SEEKER_PASSWORD        an existing seeker account
+//   SMOKE_RECRUITER_EMAIL / SMOKE_RECRUITER_PASSWORD  an existing recruiter account
+//   SMOKE_COMPANY_ID (default co-brightline)          the gateway's DEV_RECRUITER_COMPANY_ID
+// It deletes the seeker's profile. Its test job ends CLOSED (only drafts can be
 // deleted), so run it against a dev database, not one you care about.
 
-import { randomUUID } from "node:crypto";
+for (const file of [".env.local", ".env"]) {
+  try {
+    process.loadEnvFile(file);
+  } catch {
+    // file not present
+  }
+}
+process.env.NEXT_PUBLIC_API_GATEWAY_URL ??= "http://localhost:8080";
+const COMPANY = process.env.SMOKE_COMPANY_ID ?? "co-brightline";
 
-process.env.NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL ??= "http://localhost:3001";
-process.env.NEXT_PUBLIC_JOB_DISCOVERY_API_URL ??= "http://localhost:3002";
-process.env.NEXT_PUBLIC_DEV_SEEKER_USER_ID = randomUUID(); // a fresh seeker every run
-process.env.JOB_POSTING_GRPC_URL ??= "localhost:50052";
-process.env.DEV_RECRUITER_USER_ID ??= "user_4a80fdb2";
-process.env.DEV_RECRUITER_COMPANY_ID ??= "co-brightline";
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set`);
+  return value;
+}
 
 let failures = 0;
 async function step(name: string, fn: () => Promise<void>) {
@@ -35,9 +43,19 @@ function expect(cond: unknown, message: string) {
 
 async function main() {
   const profile = await import("../src/lib/api/candidate-profile");
-  const actions = await import("../src/lib/api/job-posting-actions");
-  const { ApiError, unwrap } = await import("../src/lib/api/errors");
+  const jobs = await import("../src/lib/api/job-posting");
   const discovery = await import("../src/lib/api/job-discovery");
+  const { ApiError } = await import("../src/lib/api/errors");
+  const { supabase } = await import("../src/lib/auth/supabase");
+
+  const signInAs = async (who: "SEEKER" | "RECRUITER") => {
+    await supabase.auth.signOut({ scope: "local" });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: required(`SMOKE_${who}_EMAIL`),
+      password: required(`SMOKE_${who}_PASSWORD`),
+    });
+    if (error) throw new Error(`sign-in as ${who.toLowerCase()} failed: ${error.message}`);
+  };
 
   const rejects = async (p: Promise<unknown>, code: string) => {
     try {
@@ -48,6 +66,13 @@ async function main() {
     }
     throw new Error(`expected ${code}, but it succeeded`);
   };
+
+  await signInAs("SEEKER");
+  await step("profile: start clean", async () => {
+    await profile.deleteProfile().catch((e) => {
+      if (!(e instanceof ApiError && e.code === "PROFILE_NOT_FOUND")) throw e;
+    });
+  });
 
   // --- Candidate Profile Service (REST) ---
   await step("profile: none yet → null", async () => expect((await profile.getProfile()) === null, "expected null"));
@@ -102,28 +127,29 @@ async function main() {
     await rejects(profile.importResume(new File(["x"], "cv.png", { type: "image/png" })), "UNSUPPORTED_FILE_TYPE");
   });
 
-  // --- Job Posting Service (gRPC via Server Actions) ---
+  // --- Job Posting Service (gRPC behind the gateway) ---
+  await signInAs("RECRUITER");
   let jobId = "";
   await step("jobs: recruiter list includes own drafts; public list is OPEN only", async () => {
-    const mine = unwrap(await actions.listMyJobsAction());
+    const mine = await jobs.listMyJobs();
     expect(mine.some((j) => j.status === "DRAFT"), "no draft in own list");
-    expect(mine.every((j) => j.companyId === "co-brightline"), "other company in own list");
-    const open = unwrap(await actions.listOpenJobsAction());
+    expect(mine.every((j) => j.companyId === COMPANY), "other company in own list");
+    const open = await jobs.listOpenJobs();
     expect(open.length > 0 && open.every((j) => j.status === "OPEN"), "public list not OPEN only");
-    const q = unwrap(await actions.listOpenJobsAction({ query: "react" }));
+    const q = await jobs.listOpenJobs({ query: "react" });
     expect(q.length > 0, "query returned nothing");
   });
   await step("jobs: create draft, publish needs full details, then publishes", async () => {
-    const draft = unwrap(await actions.createJobAction({
+    const draft = await jobs.createJob({
       title: "E2E Backend Engineer", description: "", responsibilities: [],
       requirements: { requiredSkills: [], preferredSkills: [], minimumExperienceYears: 0, educationLevel: "NONE", acceptedFields: [] },
       location: {}, salary: { currency: "THB", visible: true }, positionsAvailable: 1, requireCoverLetter: false,
-    }));
+    });
     jobId = draft.id;
     expect(draft.status === "DRAFT" && /^job_[0-9A-Z]{26}$/.test(draft.id), `bad draft ${draft.id}`);
-    const failed = await actions.publishJobAction(jobId);
-    expect(!failed.ok && failed.error.code === "VALIDATION_ERROR" && (failed.error.fieldErrors?.length ?? 0) >= 4, JSON.stringify(failed));
-    unwrap(await actions.updateJobAction(jobId, {
+    const failed = await rejects(jobs.publishJob(jobId), "VALIDATION_ERROR");
+    expect((failed.fieldErrors?.length ?? 0) >= 4, JSON.stringify(failed.fieldErrors));
+    await jobs.updateJob(jobId, {
       title: "E2E Backend Engineer", description: "Build services", responsibilities: ["Write tests"],
       requirements: {
         requiredSkills: [{ name: "Python", level: "INTERMEDIATE", minimumYears: 1 }], preferredSkills: [{ name: "Docker", level: "BASIC" }],
@@ -132,40 +158,41 @@ async function main() {
       employmentType: "FULL_TIME", workArrangement: "HYBRID", location: { country: "Thailand", province: "Bangkok", district: "Pathum Wan" },
       salary: { minimum: 35000, maximum: 50000, currency: "THB", visible: true },
       applicationDeadline: "2099-10-31T16:59:59.000Z", positionsAvailable: 2, requireCoverLetter: false,
-    }));
-    const open = unwrap(await actions.publishJobAction(jobId));
+    });
+    const open = await jobs.publishJob(jobId);
     expect(open.status === "OPEN" && !!open.publishedAt, "not published");
-    const pub = unwrap(await actions.getJobAction(jobId));
+    const pub = await jobs.getJob(jobId);
     expect(pub.location.district === "Pathum Wan" && pub.salary.minimum === 35000, "public read mismatch");
   });
   await step("jobs: resume template attach, read, delete", async () => {
-    const fd = new FormData();
-    fd.set("file", new File(["%PDF-1.7 template"], "Template.pdf", { type: "application/pdf" }));
-    const t = unwrap(await actions.attachResumeTemplateAction(jobId, fd));
+    const t = await jobs.attachResumeTemplate(jobId, new File(["%PDF-1.7 template"], "Template.pdf", { type: "application/pdf" }));
     expect(t.fileName === "Template.pdf" && t.sizeBytes === 17, JSON.stringify(t));
-    expect(unwrap(await actions.getResumeTemplateAction(jobId))?.id === t.id, "template not found");
-    unwrap(await actions.deleteResumeTemplateAction(jobId));
-    expect(unwrap(await actions.getResumeTemplateAction(jobId)) === null, "template not deleted");
+    expect((await jobs.getResumeTemplate(jobId))?.id === t.id, "template not found");
+    await jobs.deleteResumeTemplate(jobId);
+    expect((await jobs.getResumeTemplate(jobId)) === null, "template not deleted");
   });
   await step("jobs: close, reopen; deleting an open job is refused", async () => {
-    expect(unwrap(await actions.closeJobAction(jobId)).status === "CLOSED", "not closed");
-    expect(unwrap(await actions.reopenJobAction(jobId)).status === "OPEN", "not reopened");
-    const del = await actions.deleteJobAction(jobId);
-    expect(!del.ok && del.error.code === "INVALID_STATE", JSON.stringify(del));
+    expect((await jobs.closeJob(jobId)).status === "CLOSED", "not closed");
+    expect((await jobs.reopenJob(jobId)).status === "OPEN", "not reopened");
+    await rejects(jobs.deleteJob(jobId), "INVALID_STATE");
   });
   await step("jobs: unknown id is NOT_FOUND; Thai duplicate skill is a readable VALIDATION_ERROR", async () => {
-    const nf = await actions.getJobAction("job_does_not_exist");
-    expect(!nf.ok && nf.error.code === "NOT_FOUND", JSON.stringify(nf));
-    const bad = await actions.createJobAction({
+    await rejects(jobs.getJob("job_does_not_exist"), "NOT_FOUND");
+    const bad = await rejects(jobs.createJob({
       title: "ครู", description: "", responsibilities: [],
       requirements: {
         requiredSkills: [{ name: "ภาษาไทย", level: "BASIC", minimumYears: 0 }, { name: "ภาษาไทย", level: "BASIC", minimumYears: 0 }],
         preferredSkills: [], minimumExperienceYears: 0, educationLevel: "NONE", acceptedFields: [],
       },
       location: {}, salary: { currency: "THB", visible: true }, positionsAvailable: 1, requireCoverLetter: false,
-    });
-    expect(!bad.ok && bad.error.fieldErrors?.[0]?.message.includes("ภาษาไทย"), JSON.stringify(bad));
+    }), "VALIDATION_ERROR");
+    expect(bad.fieldErrors?.[0]?.message.includes("ภาษาไทย"), JSON.stringify(bad.fieldErrors));
   });
+  await step("jobs: seekers are refused recruiter routes", async () => {
+    await signInAs("SEEKER");
+    await rejects(jobs.listMyJobs(), "FORBIDDEN");
+  });
+
   // --- Job Discovery Service (REST; reads the two services above over gRPC) ---
   await step("discovery: match real profile vs real job", async () => {
     const m = await discovery.getMatchResult(jobId);
@@ -186,9 +213,10 @@ async function main() {
 
   // --- clean up what this run created ---
   await step("cleanup: close e2e job, delete profile", async () => {
-    unwrap(await actions.closeJobAction(jobId));
     await profile.deleteProfile();
     expect((await profile.getProfile()) === null, "profile still there");
+    await signInAs("RECRUITER");
+    await jobs.closeJob(jobId);
   });
 
   console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILED`);

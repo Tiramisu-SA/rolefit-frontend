@@ -1,29 +1,27 @@
 # RoleFit Frontend
 
-Next.js web app for RoleFit (Job Seeker and Recruiter). It talks to three backend services:
+Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **one** backend, the
+[API Gateway](../rolefit-api-gateway) (`:8080`), with the signed-in user's Supabase access token
+(`Authorization: Bearer …`). The gateway routes each request to a service:
 
-| Service | Protocol | Called from |
-| --- | --- | --- |
-| Candidate Profile Service | REST/JSON (`:3001`) | the browser |
-| Job Posting Service | gRPC (`:50052`) | the Next.js server, through Server Actions (`src/lib/api/job-posting-actions.ts`) |
-| Job Discovery Service | REST/JSON (`:3002`) | the browser (search, recommendations, job fit; it reads profiles and jobs from the two services above over gRPC) |
+| Gateway path | Service |
+| --- | --- |
+| `/api/candidates/*` | Candidate Profile Service (REST) |
+| `/api/discovery/*` | Job Discovery Service (REST: search, recommendations, job fit) |
+| `/api/jobs/*` | Job Posting Service (the gateway translates to gRPC) |
 
-Resume Preparation and Application are still browser-side mocks, but they read the real jobs and profile (and Application snapshots the match from Job Discovery).
-Design: [docs/superpowers/specs/2026-09-27-backend-integration-design.md](docs/superpowers/specs/2026-09-27-backend-integration-design.md).
+All calls go through `src/lib/api/gateway.ts`. Resume Preparation and Application are still browser-side
+mocks, but they read the real jobs and profile (and Application snapshots the match from Job Discovery).
 
 ## Environment (`.env.local`)
 
 ```env
-NEXT_PUBLIC_CANDIDATE_PROFILE_API_URL=http://localhost:3001
-NEXT_PUBLIC_JOB_DISCOVERY_API_URL=http://localhost:3002
-NEXT_PUBLIC_DEV_SEEKER_USER_ID=<any UUID>       # mock seeker identity (sent as X-User-Id)
-JOB_POSTING_GRPC_URL=localhost:50052            # server only
-DEV_RECRUITER_USER_ID=user_4a80fdb2             # server only, mock recruiter identity
-DEV_RECRUITER_COMPANY_ID=co-brightline          # server only; matches the seeded jobs
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 ```
 
 `NEXT_PUBLIC_*` values are built into the browser bundle: restart `npm run dev` (or rebuild) after changing them.
-Auth is mocked; the role switch on the login page only picks which area you see.
 
 ## Scripts
 
@@ -32,4 +30,4 @@ Auth is mocked; the role switch on the login page only picks which area you see.
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | Unit tests (vitest): mappers, API clients, form validation |
 | `npm run lint` | ESLint |
-| `npx tsx --conditions=react-server scripts/e2e-smoke.ts` | End-to-end smoke test against the three running services (uses a fresh seeker id; leaves one closed test job) |
+| `npx tsx --conditions=react-server scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts); deletes the seeker's profile and leaves one closed test job |
