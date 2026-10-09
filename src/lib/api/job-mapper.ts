@@ -1,24 +1,11 @@
-import { ApiError, type FieldError } from "@/lib/api/errors";
 import type { JobPosting, JobPostingInput, JobStatus, ResumeTemplateInfo } from "@/lib/types";
 
 // Pure mapping between the Job Posting proto messages (snake_case, prefixed
-// enums, "" / UNSPECIFIED for "not set") and the frontend types. No gRPC
-// imports here, so it can be unit tested and used anywhere.
+// enums, "" / UNSPECIFIED for "not set") as returned by the API Gateway, and
+// the frontend types.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Msg = Record<string, any>;
-
-/** The gRPC status codes this app cares about (from @grpc/grpc-js `status`). */
-export const GRPC_STATUS = {
-  INVALID_ARGUMENT: 3,
-  DEADLINE_EXCEEDED: 4,
-  NOT_FOUND: 5,
-  PERMISSION_DENIED: 7,
-  FAILED_PRECONDITION: 9,
-  INTERNAL: 13,
-  UNAVAILABLE: 14,
-  UNAUTHENTICATED: 16,
-} as const;
 
 const PREFIX = {
   status: "JOB_STATUS_",
@@ -130,43 +117,4 @@ export function toResumeTemplateInfo(msg: Msg): ResumeTemplateInfo {
     sizeBytes: Number(msg.size_bytes),
     createdAt: msg.created_at,
   };
-}
-
-interface GrpcLikeError {
-  code?: number;
-  details?: string;
-  metadata?: { get(key: string): unknown[] };
-}
-
-function readFieldErrors(err: GrpcLikeError): FieldError[] | undefined {
-  const [raw] = err.metadata?.get("x-validation-errors") ?? [];
-  if (typeof raw !== "string") return undefined;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as FieldError[]) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** A gRPC error from the Job Posting Service → an ApiError safe to show in the UI. */
-export function grpcErrorToApiError(err: GrpcLikeError): ApiError {
-  const details = err.details || "The job service returned an error";
-  switch (err.code) {
-    case GRPC_STATUS.INVALID_ARGUMENT:
-      return new ApiError("VALIDATION_ERROR", details, 400, readFieldErrors(err));
-    case GRPC_STATUS.NOT_FOUND:
-      return new ApiError("NOT_FOUND", details, 404);
-    case GRPC_STATUS.FAILED_PRECONDITION:
-      return new ApiError("INVALID_STATE", details, 409);
-    case GRPC_STATUS.PERMISSION_DENIED:
-      return new ApiError("FORBIDDEN", details, 403);
-    case GRPC_STATUS.UNAUTHENTICATED:
-      return new ApiError("UNAUTHENTICATED", details, 401);
-    case GRPC_STATUS.UNAVAILABLE:
-    case GRPC_STATUS.DEADLINE_EXCEEDED:
-      return new ApiError("SERVICE_UNAVAILABLE", "Job service is unavailable. Please try again.", 503);
-    default:
-      return new ApiError("INTERNAL", "Something went wrong with the job service. Please try again.", 500);
-  }
 }

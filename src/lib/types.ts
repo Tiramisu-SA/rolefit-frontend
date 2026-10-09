@@ -174,7 +174,7 @@ export interface ProfileBasics {
 }
 
 export interface CandidateProfile extends ProfileBasics {
-  /** Also the owner's user id (the seeker's X-User-Id). */
+  /** Also the owner's user id (the signed-in seeker's Supabase user id). */
   id: string;
   verified: boolean;
   totalExperienceMonths: number;

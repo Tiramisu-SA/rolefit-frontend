@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRPC_STATUS, grpcErrorToApiError, toJobPosting, toProtoJobInput, toProtoStatus, toResumeTemplateInfo } from "./job-mapper";
+import { toJobPosting, toProtoJobInput, toProtoStatus, toResumeTemplateInfo } from "./job-mapper";
 import type { JobPostingInput } from "@/lib/types";
 
 // A Job message as @grpc/proto-loader decodes it (keepCase, enums: String, defaults: true).
@@ -127,49 +127,5 @@ describe("toResumeTemplateInfo", () => {
     expect(
       toResumeTemplateInfo({ id: "template_1", job_id: "job_1", file_name: "Standard.pdf", content_type: "application/pdf", size_bytes: "1234", created_at: "2026-09-27T00:00:00.000Z" }),
     ).toEqual({ id: "template_1", fileName: "Standard.pdf", contentType: "application/pdf", sizeBytes: 1234, createdAt: "2026-09-27T00:00:00.000Z" });
-  });
-});
-
-function grpcError(code: number, details: string, metadata: Record<string, string> = {}) {
-  return { code, details, metadata: { get: (key: string) => (key in metadata ? [metadata[key]] : []) } };
-}
-
-describe("grpcErrorToApiError", () => {
-  it("maps each status to a code and keeps the service message", () => {
-    expect(grpcErrorToApiError(grpcError(GRPC_STATUS.NOT_FOUND, "Job not found"))).toMatchObject({ code: "NOT_FOUND", message: "Job not found", status: 404 });
-    expect(grpcErrorToApiError(grpcError(GRPC_STATUS.FAILED_PRECONDITION, "Only draft jobs can be deleted"))).toMatchObject({ code: "INVALID_STATE", status: 409 });
-    expect(grpcErrorToApiError(grpcError(GRPC_STATUS.PERMISSION_DENIED, "Other company"))).toMatchObject({ code: "FORBIDDEN", status: 403 });
-    expect(grpcErrorToApiError(grpcError(GRPC_STATUS.UNAUTHENTICATED, "Sign in"))).toMatchObject({ code: "UNAUTHENTICATED", status: 401 });
-  });
-
-  it("reads field errors from x-validation-errors", () => {
-    const err = grpcErrorToApiError(
-      grpcError(GRPC_STATUS.INVALID_ARGUMENT, "title: Is required", {
-        "x-validation-errors": JSON.stringify([{ field: "title", message: "Is required" }]),
-      }),
-    );
-    expect(err.code).toBe("VALIDATION_ERROR");
-    expect(err.fieldErrors).toEqual([{ field: "title", message: "Is required" }]);
-  });
-
-  it("ignores unreadable x-validation-errors", () => {
-    const err = grpcErrorToApiError(grpcError(GRPC_STATUS.INVALID_ARGUMENT, "bad", { "x-validation-errors": "{not json" }));
-    expect(err.fieldErrors).toBeUndefined();
-  });
-
-  it("turns UNAVAILABLE and DEADLINE_EXCEEDED into SERVICE_UNAVAILABLE", () => {
-    for (const code of [GRPC_STATUS.UNAVAILABLE, GRPC_STATUS.DEADLINE_EXCEEDED]) {
-      expect(grpcErrorToApiError(grpcError(code, "connect ECONNREFUSED 127.0.0.1:50052"))).toMatchObject({
-        code: "SERVICE_UNAVAILABLE",
-        message: "Job service is unavailable. Please try again.",
-      });
-    }
-  });
-
-  it("hides the details of unexpected errors", () => {
-    expect(grpcErrorToApiError(grpcError(GRPC_STATUS.INTERNAL, "stack trace..."))).toMatchObject({
-      code: "INTERNAL",
-      message: "Something went wrong with the job service. Please try again.",
-    });
   });
 });
