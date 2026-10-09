@@ -1,7 +1,7 @@
 // End-to-end smoke test: drives the frontend's API modules through the API Gateway.
 //
 //   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery must be running.
-//   npx tsx --conditions=react-server scripts/e2e-smoke.ts
+//   npx tsx scripts/e2e-smoke.ts
 //
 // Env (read from the environment, then .env.local / .env):
 //   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_API_GATEWAY_URL (default http://localhost:8080)

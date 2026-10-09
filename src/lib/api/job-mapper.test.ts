@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { toJobPosting, toProtoJobInput, toProtoStatus, toResumeTemplateInfo } from "./job-mapper";
 import type { JobPostingInput } from "@/lib/types";
 
-// A Job message as @grpc/proto-loader decodes it (keepCase, enums: String, defaults: true).
+// A Job message as the API Gateway returns it (keepCase, enums: String, defaults: true).
 const PROTO_JOB = {
   id: "job_1",
   title: "Backend",

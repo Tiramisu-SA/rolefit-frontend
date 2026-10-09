@@ -30,4 +30,4 @@ NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | Unit tests (vitest): mappers, API clients, form validation |
 | `npm run lint` | ESLint |
-| `npx tsx --conditions=react-server scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts); deletes the seeker's profile and leaves one closed test job |
+| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts), optional `SMOKE_COMPANY_ID` (default `co-brightline`; must equal the gateway's `DEV_RECRUITER_COMPANY_ID`); deletes the seeker's profile and leaves one closed test job |
