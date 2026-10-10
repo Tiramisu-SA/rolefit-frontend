@@ -203,7 +203,7 @@ async function main() {
     expect(fit.id === jobId && fit.company.id === fit.companyId, JSON.stringify(fit));
     const found = await discovery.searchJobs({ query: fit.title });
     expect(found.some((j) => j.id === jobId), `search for "${fit.title}" missed ${jobId}`);
-    const recs = await discovery.getRecommendations(100);
+    const recs = await discovery.getRecommendations(50);
     expect(recs.some((j) => j.id === jobId), "recommendations missed the job");
     expect(recs.every((j, i) => i === 0 || recs[i - 1].match.score >= j.match.score), "not sorted by score");
   });
