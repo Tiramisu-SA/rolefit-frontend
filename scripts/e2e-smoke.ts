@@ -7,7 +7,6 @@
 //   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_API_GATEWAY_URL (default http://localhost:8080)
 //   SMOKE_SEEKER_EMAIL / SMOKE_SEEKER_PASSWORD        an existing seeker account
 //   SMOKE_RECRUITER_EMAIL / SMOKE_RECRUITER_PASSWORD  an existing recruiter account
-//   SMOKE_COMPANY_ID (default co-brightline)          the gateway's DEV_RECRUITER_COMPANY_ID
 // It deletes the seeker's profile. Its test job ends CLOSED (only drafts can be
 // deleted), so run it against a dev database, not one you care about.
 
@@ -19,7 +18,6 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 process.env.NEXT_PUBLIC_API_GATEWAY_URL ??= "http://localhost:8080";
-const COMPANY = process.env.SMOKE_COMPANY_ID ?? "co-brightline";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -130,10 +128,13 @@ async function main() {
   // --- Job Posting Service (gRPC behind the gateway) ---
   await signInAs("RECRUITER");
   let jobId = "";
-  await step("jobs: recruiter list includes own drafts; public list is OPEN only", async () => {
+  let companyId = "";
+  await step("jobs: recruiter has a real company; own list holds only its jobs; public list is OPEN only", async () => {
+    const company = await jobs.getRecruiterCompany();
+    companyId = company.id;
+    expect(/^co-[a-z0-9-]+-[0-9a-f]{6}$/.test(companyId), `unexpected company id ${companyId} (run the Supabase SQL and sign in again)`);
     const mine = await jobs.listMyJobs();
-    expect(mine.some((j) => j.status === "DRAFT"), "no draft in own list");
-    expect(mine.every((j) => j.companyId === COMPANY), "other company in own list");
+    expect(mine.every((j) => j.companyId === companyId), "other company in own list");
     const open = await jobs.listOpenJobs();
     expect(open.length > 0 && open.every((j) => j.status === "OPEN"), "public list not OPEN only");
     const q = await jobs.listOpenJobs({ query: "react" });
@@ -146,6 +147,8 @@ async function main() {
       location: {}, salary: { currency: "THB", visible: true }, positionsAvailable: 1, requireCoverLetter: false,
     });
     jobId = draft.id;
+    expect(draft.companyId === companyId, `draft company ${draft.companyId}`);
+    expect((await jobs.listMyJobs({ status: "DRAFT" })).some((j) => j.id === jobId), "new draft missing from own list");
     expect(draft.status === "DRAFT" && /^job_[0-9A-Z]{26}$/.test(draft.id), `bad draft ${draft.id}`);
     const failed = await rejects(jobs.publishJob(jobId), "VALIDATION_ERROR");
     expect((failed.fieldErrors?.length ?? 0) >= 4, JSON.stringify(failed.fieldErrors));

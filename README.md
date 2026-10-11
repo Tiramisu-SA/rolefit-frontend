@@ -39,4 +39,4 @@ Each recruiter account gets its own company (`co-<name>-<6 hex>`, e.g. `co-acme-
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | Unit tests (vitest): mappers, API clients, form validation |
 | `npm run lint` | ESLint |
-| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts), optional `SMOKE_COMPANY_ID` (default `co-brightline`; must equal the gateway's `DEV_RECRUITER_COMPANY_ID`); deletes the seeker's profile and leaves one closed test job |
+| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts) (the recruiter must have a company id — see Supabase setup); deletes the seeker's profile and leaves one closed test job |
