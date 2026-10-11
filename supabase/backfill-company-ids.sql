@@ -6,7 +6,7 @@
 update auth.users u
 set raw_app_meta_data =
   coalesce(u.raw_app_meta_data, '{}'::jsonb) || jsonb_build_object(
-    'company_id', 'co-' || public.company_slug(u.raw_user_meta_data ->> 'company') || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 6),
+    'company_id', public.new_company_id(u.raw_user_meta_data ->> 'company'),
     'company_name', coalesce(nullif(trim(u.raw_user_meta_data ->> 'company'), ''), 'Company')
   )
 where u.raw_app_meta_data ->> 'role' = 'recruiter'

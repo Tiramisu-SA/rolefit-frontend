@@ -43,16 +43,42 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (
-    select 1
-    from auth.users u
-    where u.raw_app_meta_data ->> 'role' = 'recruiter'
-      and public.normalize_company_name(u.raw_app_meta_data ->> 'company_name') = public.normalize_company_name(name)
-  );
+  -- Demo company names (src/lib/companies.ts, Job Posting seed) are reserved too.
+  select public.normalize_company_name(name) = any (array[
+      'brightline analytics', 'harbor fintech', 'cobalt studio', 'meridian health',
+      'atlas logistics', 'pinecrest software', 'lotus retail group'
+    ])
+    or exists (
+      select 1
+      from auth.users u
+      where u.raw_app_meta_data ->> 'role' = 'recruiter'
+        and public.normalize_company_name(u.raw_app_meta_data ->> 'company_name') = public.normalize_company_name(name)
+    );
 $$;
 
 revoke all on function public.company_name_taken(text) from public;
 grant execute on function public.company_name_taken(text) to anon, authenticated;
+
+-- A new company id for a name: co-<slug>-<6 hex>, retried until no user has it.
+create or replace function public.new_company_id(name text)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  candidate text;
+begin
+  loop
+    candidate := 'co-' || public.company_slug(name) || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 6);
+    exit when not exists (select 1 from auth.users u where u.raw_app_meta_data ->> 'company_id' = candidate);
+  end loop;
+  return candidate;
+end;
+$$;
+
+revoke all on function public.new_company_id(text) from public;
 
 create or replace function public.set_role_on_signup()
 returns trigger
@@ -77,7 +103,7 @@ begin
       raise exception 'company already registered';
     end if;
     extra := jsonb_build_object(
-      'company_id', 'co-' || public.company_slug(company) || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 6),
+      'company_id', public.new_company_id(company),
       'company_name', company
     );
   end if;
