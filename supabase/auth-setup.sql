@@ -30,7 +30,7 @@ immutable
 set search_path = ''
 as $$
   select coalesce(
-    nullif(left(trim(both '-' from regexp_replace(lower(coalesce(name, '')), '[^a-z0-9]+', '-', 'g')), 40), ''),
+    nullif(trim(both '-' from left(trim(both '-' from regexp_replace(lower(coalesce(name, '')), '[^a-z0-9]+', '-', 'g')), 40)), ''),
     'company'
   );
 $$;
