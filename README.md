@@ -12,6 +12,8 @@ Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **o
 
 All calls go through `src/lib/api/gateway.ts`. Resume Preparation and Application are still browser-side
 mocks, but they read the real jobs and profile (and Application snapshots the match from Job Discovery).
+The gateway already routes the Application Service (`/api/applications/*`, in development); the frontend
+switches to it once the service supports submitting applications.
 
 ## Environment (`.env.local`)
 
