@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session as SupabaseSession } from "@supabase/supabase-js";
 import { supabase } from "@/lib/auth/supabase";
+import { isCompanyNameTaken } from "@/lib/auth/company";
 import type { Role } from "@/lib/types";
 
 interface Session {
@@ -87,10 +88,17 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(async ({ role, name, email, password, company }: SignUpInput) => {
+    if (role === "recruiter" && company) {
+      try {
+        if (await isCompanyNameTaken(company)) return "This company is already registered.";
+      } catch {
+        return "Can't check the company name right now. Please try again.";
+      }
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      // Lands in user_metadata. The database trigger copies `role` into app_metadata.
+      // Lands in user_metadata. The database trigger copies role (and, for recruiters, company_id / company_name) into app_metadata.
       options: { data: { role, name, ...(company ? { company } : {}) } },
     });
     if (error) return error.message;
