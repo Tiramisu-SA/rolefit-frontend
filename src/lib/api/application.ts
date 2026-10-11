@@ -4,6 +4,7 @@ import * as candidateProfile from "./candidate-profile";
 import { ApiError } from "./errors";
 import * as jobDiscovery from "./job-discovery";
 import * as jobPosting from "./job-posting";
+import * as resumePreparation from "./resume-preparation";
 import { SEEKER_ID, newId, nowIso, simulate, store } from "./_store";
 
 // Mock of the Application Service: applications live in the browser session,
@@ -33,10 +34,9 @@ export async function submitApplication(jobId: string): Promise<ApplicationView>
   const [job, profile] = await Promise.all([jobPosting.getJob(jobId), candidateProfile.getProfile()]);
   if (job.status !== "OPEN") throw new ApiError("JOB_NOT_OPEN", "This job is no longer accepting applications");
   if (!profile) throw new ApiError("PROFILE_REQUIRED", "Create your profile before applying");
-  const match = await jobDiscovery.getMatchResult(jobId);
+  // BUC-2C steps 3–4: the approved resume from the Resume Preparation Service, the match from Job Discovery.
+  const [draft, match] = await Promise.all([resumePreparation.getApprovedResume(jobId), jobDiscovery.getMatchResult(jobId)]);
   return simulate(() => {
-    const draft = store.resumeDrafts.find((r) => r.jobId === jobId && r.candidateId === SEEKER_ID && r.approved);
-    if (!draft) throw new ApiError("RESUME_NOT_APPROVED", "Approve your resume before applying");
     if (store.applications.some((a) => a.jobId === jobId && a.candidateId === SEEKER_ID)) {
       throw new ApiError("ALREADY_APPLIED", "You've already applied to this job");
     }

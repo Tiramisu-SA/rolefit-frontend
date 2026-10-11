@@ -9,9 +9,10 @@ Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **o
 | `/api/candidates/*` | Candidate Profile Service (REST) |
 | `/api/discovery/*` | Job Discovery Service (REST: search, recommendations, job fit) |
 | `/api/jobs/*` | Job Posting Service (the gateway translates to gRPC) |
+| `/api/resumes/*` | Resume Preparation Service (REST: tailored resume drafts) |
 
-All calls go through `src/lib/api/gateway.ts`. Resume Preparation and Application are still browser-side
-mocks, but they read the real jobs and profile (and Application snapshots the match from Job Discovery).
+All calls go through `src/lib/api/gateway.ts`. Application is still a browser-side mock, but it reads the real
+jobs, profile and approved resume (and snapshots the match from Job Discovery).
 
 ## Environment (`.env.local`)
 
