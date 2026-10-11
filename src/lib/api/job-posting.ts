@@ -1,4 +1,4 @@
-import { companyFor } from "@/lib/companies";
+import { companyFor, initialsOf } from "@/lib/companies";
 import type { Company, JobPosting, JobPostingInput, JobStatus, JobWithCompany, ResumeTemplateInfo } from "@/lib/types";
 import { ApiError } from "./errors";
 import { gatewayRequest } from "./gateway";
@@ -86,9 +86,11 @@ export async function deleteResumeTemplate(id: string): Promise<void> {
   await request<void>("DELETE", mine(id, "/resume-template"));
 }
 
+/** The signed-in recruiter's company. The gateway reads it from the Supabase token. */
 export async function getRecruiterCompany(): Promise<Company> {
-  const { companyId } = await request<{ companyId: string }>("GET", "/mine/company");
-  return companyFor(companyId);
+  const { companyId, companyName } = await request<{ companyId: string; companyName?: string }>("GET", "/mine/company");
+  const company = companyFor(companyId);
+  return companyName ? { ...company, name: companyName, initials: initialsOf(companyName) } : company;
 }
 
 // --- seeker / public ---

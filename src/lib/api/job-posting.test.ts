@@ -123,10 +123,13 @@ describe("job posting client", () => {
     await expect(jobsApi.publishJob("job_1")).rejects.toMatchObject({ code: "VALIDATION_ERROR", status: 400, fieldErrors: [{ field: "title", message: "Is required" }] });
   });
 
-  it("gets the recruiter company from the gateway", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, { companyId: "co-brightline" }));
+  it("gets the recruiter company from the gateway, preferring its company name", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(200, { companyId: "co-acme-corp-7f3a9c", companyName: "บริษัท แอคมี" }));
     const company = await jobsApi.getRecruiterCompany();
     expect(fetchMock.mock.calls[0][0]).toBe(`${GW}/api/jobs/mine/company`);
-    expect(company.id).toBe("co-brightline");
+    expect(company).toMatchObject({ id: "co-acme-corp-7f3a9c", name: "บริษัท แอคมี", initials: "บแ" });
+
+    fetchMock.mockImplementation(async () => jsonResponse(200, { companyId: "co-acme-corp-7f3a9c" }));
+    expect((await jobsApi.getRecruiterCompany()).name).toBe("Acme Corp");
   });
 });
