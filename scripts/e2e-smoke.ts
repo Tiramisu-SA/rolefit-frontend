@@ -227,12 +227,15 @@ async function main() {
   });
   await step("applications: recruiter sees the applicant and updates the status", async () => {
     await signInAs("RECRUITER");
-    const job = await jobs.getMyJob(jobId);
-    const list = await applications.listApplicantsForJob(job);
-    expect(list.some((a) => a.id === applicationId), "applicant missing for recruiter");
-    const updated = await applications.updateApplicationStatus(applicationId, "Under review", "E2E review");
-    expect(updated.status === "Under review" && updated.history.length >= 2, JSON.stringify(updated.history));
-    await signInAs("SEEKER");
+    try {
+      const job = await jobs.getMyJob(jobId);
+      const list = await applications.listApplicantsForJob(job);
+      expect(list.some((a) => a.id === applicationId), "applicant missing for recruiter");
+      const updated = await applications.updateApplicationStatus(applicationId, "Under review", "E2E review");
+      expect(updated.status === "Under review" && updated.history.length >= 2, JSON.stringify(updated.history));
+    } finally {
+      await signInAs("SEEKER");
+    }
   });
 
   // --- clean up what this run created ---

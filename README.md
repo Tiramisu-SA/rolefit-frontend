@@ -9,11 +9,19 @@ Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **o
 | `/api/candidates/*` | Candidate Profile Service (REST) |
 | `/api/discovery/*` | Job Discovery Service (REST: search, recommendations, job fit) |
 | `/api/jobs/*` | Job Posting Service (the gateway translates to gRPC) |
+| `/api/applications/*` | Application Service (REST: submit, my applications, applicants, status changes) |
 
-All calls go through `src/lib/api/gateway.ts`. The Application Service is real (submit, my applications, recruiter applicants and status changes through
-`/api/applications/*`; a status change emails the candidate via the Notification Service). Resume Preparation
-is still a browser mock, so run the Application Service locally with `APP_ENV=development` and
-`RESUME_PREPARATION_MODE=fallback` until the resume page is integrated.
+All calls go through `src/lib/api/gateway.ts`. The Application Service is real (submit, my
+applications, recruiter applicants and status changes through `/api/applications/*`; a status change
+emails the candidate via the Notification Service). Resume Preparation is still a browser mock, so run
+the Application Service locally with `APP_ENV=development` and `RESUME_PREPARATION_MODE=fallback` until
+the resume page is integrated.
+
+## Known limitations
+
+- Jobs that require a cover letter can't be applied to yet: the Apply dialog has no cover-letter field,
+  and the service answers `COVER_LETTER_REQUIRED`.
+- The resume flow is still a browser mock.
 
 ## Environment (`.env.local`)
 

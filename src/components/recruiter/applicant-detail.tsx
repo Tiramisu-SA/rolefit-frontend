@@ -22,9 +22,6 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
   const [saving, setSaving] = useState(false);
   const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Local state can go stale across selections in the applicant list; re-derive on each render
-  // instead of via effect, since this component is remounted per-selection by its `key` upstream.
-
   const snapshot = application.matchSnapshot;
   const firstName = application.candidate.name.trim().split(/\s+/)[0] ?? application.candidate.name;
   const resumeLabel = application.resumeFormat === "company" ? "Company template" : "Personal format";
@@ -53,8 +50,8 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
     if (!selectedStatus || selectedStatus === application.status || saving) return;
     setSaving(true);
     try {
-      const updated = await applicationService.updateApplicationStatus(application.id, selectedStatus, note.trim() || undefined);
-      toast.success(`Status updated. ${firstName} will get an email about the change.`);
+      const updated = await applicationService.updateApplicationStatus(application.id, selectedStatus, note.trim() || undefined, application.job);
+      toast.success(updated.notificationQueued ? `Status updated. ${firstName} will get an email about the change.` : "Status updated.");
       setNote("");
       onUpdated(updated);
     } catch (e) {

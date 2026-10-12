@@ -66,12 +66,18 @@ describe("application client", () => {
       url.startsWith(`${GW}/api/applications`) ? jsonResponse(201, { application: rawApp() }) : jsonResponse(200, { job: protoJob("job_1") }),
     );
     const view = await applications.submitApplication("job_1");
-    const [url, init] = fetchMock.mock.calls[0];
+    expect(fetchMock.mock.calls[0][0]).toBe(`${GW}/api/jobs/job_1`);
+    const [url, init] = fetchMock.mock.calls[1];
     expect([url, init.method]).toEqual([`${GW}/api/applications`, "POST"]);
     expect(JSON.parse(init.body)).toEqual({ jobId: "job_1" });
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
-    expect(fetchMock.mock.calls[1][0]).toBe(`${GW}/api/jobs/job_1`);
     expect(view).toMatchObject({ id: "app_1", job: { id: "job_1" } });
+  });
+
+  it("does not submit when the job cannot be fetched", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(404, { error: { code: "NOT_FOUND", message: "Job not found" } }));
+    await expect(applications.submitApplication("job_1")).rejects.toBeDefined();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 
   it("keeps the service's error code and message when submitting fails", async () => {
@@ -122,5 +128,14 @@ describe("application client", () => {
 
     await applications.updateApplicationStatus("app_1", "Offer", "   ");
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ status: "Offer" });
+  });
+
+  it("makes only the PATCH when the job is passed in", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(200, { application: rawApp({ status: "Interview" }), notificationQueued: true }));
+    const job = { id: "job_1" } as Parameters<typeof applications.listApplicantsForJob>[0];
+    const view = await applications.updateApplicationStatus("app_1", "Interview", undefined, job);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(view.job).toBe(job);
+    expect(view.notificationQueued).toBe(true);
   });
 });

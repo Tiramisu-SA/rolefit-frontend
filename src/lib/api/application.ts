@@ -62,11 +62,15 @@ async function jobsFor(ids: string[]): Promise<Map<string, JobWithCompany>> {
   return byId;
 }
 
-/** Applies to an open job with the approved resume; the service snapshots the resume and the match. */
+/**
+ * Applies to an open job with the approved resume; the service snapshots the resume and the match.
+ * The job is fetched first so a lookup failure happens before anything is saved.
+ */
 export async function submitApplication(jobId: string, coverLetter?: string): Promise<ApplicationView> {
+  const job = await jobPosting.getJob(jobId);
   const body = coverLetter?.trim() ? { jobId, coverLetter: coverLetter.trim() } : { jobId };
   const { application } = await request<{ application: Msg }>("POST", "", { json: body });
-  return { ...toApplication(application), job: await jobPosting.getJob(jobId) };
+  return { ...toApplication(application), job };
 }
 
 export async function listMyApplications(): Promise<ApplicationView[]> {
@@ -88,10 +92,18 @@ export async function listApplicantsForJob(job: JobWithCompany): Promise<Applica
     .map((a) => ({ ...a, job }));
 }
 
-/** Changes the status; the Application Service queues the candidate's notification email. */
-export async function updateApplicationStatus(id: string, status: ApplicationStatus, note?: string): Promise<ApplicationView> {
+/**
+ * Changes the status; the Application Service queues the candidate's notification email.
+ * Pass the job when the caller already has it: that avoids a second request after the change is saved.
+ */
+export async function updateApplicationStatus(
+  id: string,
+  status: ApplicationStatus,
+  note?: string,
+  job?: JobWithCompany,
+): Promise<ApplicationView & { notificationQueued: boolean }> {
   const body = note?.trim() ? { status, note: note.trim() } : { status };
-  const { application } = await request<{ application: Msg }>("PATCH", `/${encodeURIComponent(id)}/status`, { json: body });
-  const updated = toApplication(application);
-  return { ...updated, job: await jobPosting.getMyJob(updated.jobId) };
+  const res = await request<{ application: Msg; notificationQueued?: boolean }>("PATCH", `/${encodeURIComponent(id)}/status`, { json: body });
+  const updated = toApplication(res.application);
+  return { ...updated, job: job ?? (await jobPosting.getMyJob(updated.jobId)), notificationQueued: Boolean(res.notificationQueued) };
 }
