@@ -138,6 +138,7 @@ export function JobsTable({
                       <MoreHorizontal className="size-4" aria-hidden />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem render={<Link href={`/recruiter/jobs/${job.id}/applicants`} />}>Applicants</DropdownMenuItem>
                       <DropdownMenuItem render={<Link href={`/recruiter/jobs/${job.id}/edit`} />}>Edit</DropdownMenuItem>
                       {job.status === "DRAFT" && (
                         <DropdownMenuItem variant="destructive" onClick={() => onDelete(job)}>

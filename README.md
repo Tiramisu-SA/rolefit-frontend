@@ -10,10 +10,10 @@ Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **o
 | `/api/discovery/*` | Job Discovery Service (REST: search, recommendations, job fit) |
 | `/api/jobs/*` | Job Posting Service (the gateway translates to gRPC) |
 
-All calls go through `src/lib/api/gateway.ts`. Resume Preparation and Application are still browser-side
-mocks, but they read the real jobs and profile (and Application snapshots the match from Job Discovery).
-The gateway already routes the Application Service (`/api/applications/*`, in development); the frontend
-switches to it once the service supports submitting applications.
+All calls go through `src/lib/api/gateway.ts`. The Application Service is real (submit, my applications, recruiter applicants and status changes through
+`/api/applications/*`; a status change emails the candidate via the Notification Service). Resume Preparation
+is still a browser mock, so run the Application Service locally with `APP_ENV=development` and
+`RESUME_PREPARATION_MODE=fallback` until the resume page is integrated.
 
 ## Environment (`.env.local`)
 
@@ -43,4 +43,4 @@ Jobs created while the gateway still used the mock company (co-brightline) stay 
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | Unit tests (vitest): mappers, API clients, form validation |
 | `npm run lint` | ESLint |
-| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services. Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts; the recruiter must have a company id — see Supabase setup); deletes the seeker's profile and leaves one closed test job |
+| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services (including the Application Service). Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts; the recruiter must have a company id — see Supabase setup); deletes the seeker's profile and leaves one closed test job |

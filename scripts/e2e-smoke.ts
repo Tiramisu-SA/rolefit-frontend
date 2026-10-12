@@ -1,6 +1,7 @@
 // End-to-end smoke test: drives the frontend's API modules through the API Gateway.
 //
-//   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery must be running.
+//   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery + Application Service (:3004,
+//   started with APP_ENV=development RESUME_PREPARATION_MODE=fallback) must be running.
 //   npx tsx scripts/e2e-smoke.ts
 //
 // Env (read from the environment, then .env.local / .env):
@@ -43,6 +44,7 @@ async function main() {
   const profile = await import("../src/lib/api/candidate-profile");
   const jobs = await import("../src/lib/api/job-posting");
   const discovery = await import("../src/lib/api/job-discovery");
+  const applications = await import("../src/lib/api/application");
   const { ApiError } = await import("../src/lib/api/errors");
   const { supabase } = await import("../src/lib/auth/supabase");
 
@@ -212,6 +214,25 @@ async function main() {
   });
   await step("discovery: unknown job is 404", async () => {
     await rejects(discovery.getMatchResult("job_does_not_exist"), "JOB_NOT_FOUND");
+  });
+
+  // --- Application Service (submission + status, through the gateway) ---
+  let applicationId = "";
+  await step("applications: seeker applies and sees the application", async () => {
+    const app = await applications.submitApplication(jobId);
+    applicationId = app.id;
+    expect(app.status === "Submitted" && app.jobId === jobId, JSON.stringify(app));
+    expect((await applications.listMyApplications()).some((a) => a.id === applicationId), "missing from my applications");
+    await rejects(applications.submitApplication(jobId), "ALREADY_APPLIED");
+  });
+  await step("applications: recruiter sees the applicant and updates the status", async () => {
+    await signInAs("RECRUITER");
+    const job = await jobs.getMyJob(jobId);
+    const list = await applications.listApplicantsForJob(job);
+    expect(list.some((a) => a.id === applicationId), "applicant missing for recruiter");
+    const updated = await applications.updateApplicationStatus(applicationId, "Under review", "E2E review");
+    expect(updated.status === "Under review" && updated.history.length >= 2, JSON.stringify(updated.history));
+    await signInAs("SEEKER");
   });
 
   // --- clean up what this run created ---
