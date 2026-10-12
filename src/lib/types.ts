@@ -269,7 +269,7 @@ export interface ResumeDraft {
   updatedAt: string;
 }
 
-// --- Application (mock) --------------------------------------------------------------
+// --- Application Service --------------------------------------------------------------
 
 export interface StatusChange {
   status: ApplicationStatus;
@@ -302,7 +302,8 @@ export interface Application {
   status: ApplicationStatus;
   submittedAt: string;
   updatedAt: string;
-  matchSnapshot: MatchSnapshot;
+  /** Captured at submission; null for applications stored without one. */
+  matchSnapshot: MatchSnapshot | null;
   history: StatusChange[];
 }
 

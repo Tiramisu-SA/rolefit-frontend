@@ -1,15 +1,49 @@
 import { profileInitials } from "@/lib/profile";
-import type { Application, ApplicationStatus, ApplicationView, JobWithCompany } from "@/lib/types";
-import * as candidateProfile from "./candidate-profile";
+import type { Application, ApplicationStatus, ApplicationView, JobWithCompany, MatchSnapshot } from "@/lib/types";
 import { ApiError } from "./errors";
-import * as jobDiscovery from "./job-discovery";
+import { gatewayRequest } from "./gateway";
 import * as jobPosting from "./job-posting";
-import { SEEKER_ID, newId, nowIso, simulate, store } from "./_store";
 
-// Mock of the Application Service: applications live in the browser session,
-// but they point at real jobs and snapshot the real profile at submit time.
+// REST client for the Application Service, reached through the API Gateway
+// (/api/applications/*, same paths upstream). Submitting stores the approved
+// resume and a match snapshot on the server; a status change queues the email
+// that the Notification Service sends.
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Msg = Record<string, any>;
+
+const request = <T>(method: string, path: string, init: { json?: unknown; query?: URLSearchParams } = {}) =>
+  gatewayRequest<T>(method, `/api/applications${path}`, { ...init, serviceName: "application service" });
 
 const byUpdated = (a: Application, b: Application) => b.updatedAt.localeCompare(a.updatedAt);
+const scoreOf = (a: Application) => a.matchSnapshot?.score ?? -1;
+
+function toMatchSnapshot(raw: Msg | null | undefined): MatchSnapshot | null {
+  if (!raw || typeof raw.score !== "number") return null;
+  return {
+    score: raw.score,
+    summary: typeof raw.summary === "string" ? raw.summary : (raw.explanation ?? ""),
+    capturedAt: raw.capturedAt ?? raw.computedAt ?? "",
+  };
+}
+
+/** The service's application → the frontend type. The service keeps only the candidate's name and email. */
+export function toApplication(raw: Msg): Application {
+  const name: string = raw.candidate?.name ?? "";
+  return {
+    id: raw.id,
+    jobId: raw.jobId,
+    candidateId: raw.candidateId,
+    candidate: { id: raw.candidate?.id ?? raw.candidateId, name, initials: profileInitials(name), headline: "", email: raw.candidate?.email ?? "" },
+    resumeDraftId: raw.resumeReference?.draftId ?? "",
+    resumeFormat: raw.resumeReference?.format === "company" ? "company" : "personal",
+    status: raw.status,
+    submittedAt: raw.submittedAt,
+    updatedAt: raw.updatedAt,
+    matchSnapshot: toMatchSnapshot(raw.matchSnapshot),
+    history: (raw.history ?? []).map((h: Msg) => ({ status: h.status, at: h.at, ...(h.note ? { note: h.note } : {}) })),
+  };
+}
 
 /**
  * Loads the jobs the seeker's applications refer to: one call for open jobs,
@@ -28,67 +62,36 @@ async function jobsFor(ids: string[]): Promise<Map<string, JobWithCompany>> {
   return byId;
 }
 
-/** Mirrors BUC-2C: job must be open, resume approved, and the match result is snapshotted. */
-export async function submitApplication(jobId: string): Promise<ApplicationView> {
-  const [job, profile] = await Promise.all([jobPosting.getJob(jobId), candidateProfile.getProfile()]);
-  if (job.status !== "OPEN") throw new ApiError("JOB_NOT_OPEN", "This job is no longer accepting applications");
-  if (!profile) throw new ApiError("PROFILE_REQUIRED", "Create your profile before applying");
-  const match = await jobDiscovery.getMatchResult(jobId);
-  return simulate(() => {
-    const draft = store.resumeDrafts.find((r) => r.jobId === jobId && r.candidateId === SEEKER_ID && r.approved);
-    if (!draft) throw new ApiError("RESUME_NOT_APPROVED", "Approve your resume before applying");
-    if (store.applications.some((a) => a.jobId === jobId && a.candidateId === SEEKER_ID)) {
-      throw new ApiError("ALREADY_APPLIED", "You've already applied to this job");
-    }
-    const at = nowIso();
-    const app: Application = {
-      id: newId("app"), jobId, candidateId: SEEKER_ID,
-      candidate: {
-        id: profile.id, name: profile.name, initials: profileInitials(profile.name),
-        headline: profile.headline ?? "", email: profile.email ?? "",
-      },
-      resumeDraftId: draft.id, resumeFormat: draft.format,
-      status: "Submitted", submittedAt: at, updatedAt: at,
-      matchSnapshot: { score: match.score, summary: match.explanation, capturedAt: at },
-      history: [{ status: "Submitted", at }],
-    };
-    store.applications.push(app);
-    return { ...app, job };
-  }, 900);
+/** Applies to an open job with the approved resume; the service snapshots the resume and the match. */
+export async function submitApplication(jobId: string, coverLetter?: string): Promise<ApplicationView> {
+  const body = coverLetter?.trim() ? { jobId, coverLetter: coverLetter.trim() } : { jobId };
+  const { application } = await request<{ application: Msg }>("POST", "", { json: body });
+  return { ...toApplication(application), job: await jobPosting.getJob(jobId) };
 }
 
 export async function listMyApplications(): Promise<ApplicationView[]> {
-  const mine = store.applications.filter((a) => a.candidateId === SEEKER_ID);
+  const { applications } = await request<{ applications: Msg[] }>("GET", "/mine");
+  const mine = applications.map(toApplication);
   const jobs = await jobsFor([...new Set(mine.map((a) => a.jobId))]);
-  return simulate(() =>
-    mine
-      .filter((a) => jobs.has(a.jobId))
-      .sort(byUpdated)
-      .map((a) => ({ ...a, job: jobs.get(a.jobId)! })),
-  );
+  return mine
+    .filter((a) => jobs.has(a.jobId))
+    .sort(byUpdated)
+    .map((a) => ({ ...a, job: jobs.get(a.jobId)! }));
 }
 
-/** Applicants for one of the recruiter's jobs (the caller already has the job). */
-export function listApplicantsForJob(job: JobWithCompany): Promise<ApplicationView[]> {
-  return simulate(() =>
-    store.applications
-      .filter((a) => a.jobId === job.id)
-      .sort((a, b) => b.matchSnapshot.score - a.matchSnapshot.score)
-      .map((a) => ({ ...a, job })),
-  );
+/** Applicants for one of the recruiter's jobs (the caller already has the job), best match first. */
+export async function listApplicantsForJob(job: JobWithCompany): Promise<ApplicationView[]> {
+  const { applications } = await request<{ applications: Msg[] }>("GET", "", { query: new URLSearchParams({ jobId: job.id }) });
+  return applications
+    .map(toApplication)
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
+    .map((a) => ({ ...a, job }));
 }
 
-/** Also stands in for Notification Adapter sendStatusNotification() — the UI shows a toast. */
+/** Changes the status; the Application Service queues the candidate's notification email. */
 export async function updateApplicationStatus(id: string, status: ApplicationStatus, note?: string): Promise<ApplicationView> {
-  const current = store.applications.find((x) => x.id === id);
-  if (!current) throw new ApiError("NOT_FOUND", "Application not found");
-  const job = await jobPosting.getMyJob(current.jobId);
-  return simulate(() => {
-    const a = store.applications.find((x) => x.id === id)!;
-    const at = nowIso();
-    a.status = status;
-    a.updatedAt = at;
-    a.history.push({ status, at, note: note?.trim() || undefined });
-    return { ...a, job };
-  });
+  const body = note?.trim() ? { status, note: note.trim() } : { status };
+  const { application } = await request<{ application: Msg }>("PATCH", `/${encodeURIComponent(id)}/status`, { json: body });
+  const updated = toApplication(application);
+  return { ...updated, job: await jobPosting.getMyJob(updated.jobId) };
 }

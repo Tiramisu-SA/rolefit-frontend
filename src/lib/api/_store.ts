@@ -1,18 +1,17 @@
-import { applications } from "@/lib/mock/applications";
-import type { Application, ResumeDraft } from "@/lib/types";
+import type { ResumeDraft } from "@/lib/types";
 import { ApiError } from "./errors";
 
-export { SEEKER_ID } from "@/lib/mock/applications";
+/** The one mock seeker in this browser (used by the Resume Preparation mock). */
+export const SEEKER_ID = "me";
 
-// In-memory state for the services that are still mocked (Resume Preparation,
-// Application). Jobs and profiles come from the real services.
+// In-memory state for the one service that is still mocked (Resume Preparation).
+// Jobs, profiles and applications come from the real services.
 interface Store {
-  applications: Application[];
   resumeDrafts: ResumeDraft[];
 }
 
 /** Lives for the browser session; reload resets it. */
-export const store: Store = structuredClone({ applications, resumeDrafts: [] });
+export const store: Store = structuredClone({ resumeDrafts: [] as ResumeDraft[] });
 
 /** Simulates network latency for mock operations. Add `?mockError=1` to the URL to make them fail. */
 export async function simulate<T>(produce: () => T, ms = 350): Promise<T> {

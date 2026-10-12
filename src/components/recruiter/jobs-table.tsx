@@ -22,6 +22,10 @@ export interface JobRow {
   avgMatch: number | null;
 }
 
+/** Rounded mean, or null for none (applications without a match snapshot are left out). */
+const average = (scores: number[]): number | null =>
+  scores.length ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : null;
+
 export async function loadJobRows(): Promise<JobRow[]> {
   const jobs = await jobPosting.listMyJobs();
   return Promise.all(
@@ -32,7 +36,7 @@ export async function loadJobRows(): Promise<JobRow[]> {
         applicants: apps.length,
         newApplicants: apps.filter((a) => a.status === "Submitted").length,
         interviews: apps.filter((a) => a.status === "Interview").length,
-        avgMatch: apps.length ? Math.round(apps.reduce((s, a) => s + a.matchSnapshot.score, 0) / apps.length) : null,
+        avgMatch: average(apps.flatMap((a) => (a.matchSnapshot ? [a.matchSnapshot.score] : []))),
       };
     }),
   );

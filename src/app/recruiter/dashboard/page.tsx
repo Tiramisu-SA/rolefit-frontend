@@ -100,7 +100,7 @@ export default function RecruiterDashboardPage() {
                       <span className="truncate text-sm text-muted-foreground">{app.job.title}</span>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <MatchBadge score={app.matchSnapshot.score} />
+                      {app.matchSnapshot && <MatchBadge score={app.matchSnapshot.score} />}
                       <StatusBadge status={app.status} audience="recruiter" />
                     </div>
                   </Link>
