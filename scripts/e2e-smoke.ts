@@ -1,7 +1,7 @@
 // End-to-end smoke test: drives the frontend's API modules through the API Gateway.
 //
-//   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery + Application Service (:3004,
-//   started with APP_ENV=development RESUME_PREPARATION_MODE=fallback) must be running.
+//   API Gateway + Candidate Profile + Job Posting (seeded) + Job Discovery + Resume Preparation (:3006 REST /
+//   :50053 gRPC) + Application Service (:3004, normal live mode) must be running.
 //   npx tsx scripts/e2e-smoke.ts
 //
 // Env (read from the environment, then .env.local / .env):
@@ -45,6 +45,7 @@ async function main() {
   const jobs = await import("../src/lib/api/job-posting");
   const discovery = await import("../src/lib/api/job-discovery");
   const applications = await import("../src/lib/api/application");
+  const resumes = await import("../src/lib/api/resume-preparation");
   const { ApiError } = await import("../src/lib/api/errors");
   const { supabase } = await import("../src/lib/auth/supabase");
 
@@ -218,7 +219,13 @@ async function main() {
 
   // --- Application Service (submission + status, through the gateway) ---
   let applicationId = "";
-  await step("applications: seeker applies and sees the application", async () => {
+  await step("applications: seeker tailors and approves a resume, applies and sees the application", async () => {
+    const draft = await resumes.generateTailoredResume(jobId);
+    expect(draft.jobId === jobId && draft.sections.length > 0, JSON.stringify(draft));
+    expect((await resumes.getResumeDraft(jobId))?.id === draft.id, "draft not readable");
+    await rejects(resumes.getApprovedResume(jobId), "RESUME_NOT_APPROVED");
+    const approved = await resumes.approveResume(jobId);
+    expect(approved.approved, "draft not approved");
     const app = await applications.submitApplication(jobId);
     applicationId = app.id;
     expect(app.status === "Submitted" && app.jobId === jobId, JSON.stringify(app));
