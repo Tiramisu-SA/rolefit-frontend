@@ -5,10 +5,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import type { EmploymentType, ExperienceLevel, JobSearchFilters, WorkArrangement } from "@/lib/types";
+import { EMPLOYMENT_TYPE_LABEL, WORK_ARRANGEMENT_LABEL } from "@/lib/labels";
+import { EMPLOYMENT_TYPES, WORK_ARRANGEMENTS, type ExperienceLevel, type JobSearchFilters } from "@/lib/types";
 
-const EMPLOYMENT_TYPES: EmploymentType[] = ["Full-time", "Part-time", "Internship", "Contract"];
-const ARRANGEMENTS: WorkArrangement[] = ["On-site", "Hybrid", "Remote"];
+const ARRANGEMENTS = WORK_ARRANGEMENTS;
 const EXPERIENCE_LEVELS: ExperienceLevel[] = ["Internship", "Entry level", "Mid level", "Senior"];
 
 const MIN_SALARY = 0;
@@ -22,7 +22,9 @@ function toggle<T>(list: T[] | undefined, value: T): T[] {
 
 interface FilterGroupProps<T extends string> {
   legend: string;
-  options: T[];
+  options: readonly T[];
+  /** Display text per option; defaults to the value itself. */
+  labels?: Record<T, string>;
   selected: T[] | undefined;
   onToggle: (value: T) => void;
   prefix: string;
@@ -36,6 +38,7 @@ function slugify(value: string): string {
 function FilterGroup<T extends string>({
   legend,
   options,
+  labels,
   selected,
   onToggle,
   prefix,
@@ -51,7 +54,7 @@ function FilterGroup<T extends string>({
           <div key={option} className="flex items-center gap-2.5">
             <Checkbox id={id} checked={checked} onCheckedChange={() => onToggle(option)} />
             <Label htmlFor={id} className="cursor-pointer text-[15px] font-normal text-foreground">
-              {option}
+              {labels?.[option] ?? option}
             </Label>
           </div>
         );
@@ -84,6 +87,7 @@ export function JobFilters({
       <FilterGroup
         legend="Employment type"
         options={EMPLOYMENT_TYPES}
+        labels={EMPLOYMENT_TYPE_LABEL}
         selected={value.employmentTypes}
         prefix="employment"
         instanceId={instanceId}
@@ -93,6 +97,7 @@ export function JobFilters({
       <FilterGroup
         legend="Work arrangement"
         options={ARRANGEMENTS}
+        labels={WORK_ARRANGEMENT_LABEL}
         selected={value.arrangements}
         prefix="arrangement"
         instanceId={instanceId}

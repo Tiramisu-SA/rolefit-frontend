@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RoleFit Frontend
 
-## Getting Started
+Next.js web app for RoleFit (Job Seeker and Recruiter). The browser talks to **one** backend, the
+[API Gateway](../rolefit-api-gateway) (`:8080`), with the signed-in user's Supabase access token
+(`Authorization: Bearer …`). The gateway routes each request to a service:
 
-First, run the development server:
+| Gateway path | Service |
+| --- | --- |
+| `/api/candidates/*` | Candidate Profile Service (REST) |
+| `/api/discovery/*` | Job Discovery Service (REST: search, recommendations, job fit) |
+| `/api/jobs/*` | Job Posting Service (the gateway translates to gRPC) |
+| `/api/applications/*` | Application Service (REST: submit, my applications, applicants, status changes) |
+| `/api/resumes/*` | Resume Preparation Service (REST: generate, edit, format, approve) |
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+All calls go through `src/lib/api/gateway.ts`. The Application Service is real (submit, my
+applications, recruiter applicants and status changes through `/api/applications/*`; a status change
+emails the candidate via the Notification Service). Resume Preparation is real through
+`/api/resumes/*` (the gateway forwards the token; the service verifies it), and Application
+submission reads the approved resume from it.
+
+## Known limitations
+
+- Jobs that require a cover letter can't be applied to yet: the Apply dialog has no cover-letter field,
+  and the service answers `COVER_LETTER_REQUIRED`.
+
+## Environment (`.env.local`)
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`NEXT_PUBLIC_*` values are built into the browser bundle: restart `npm run dev` (or rebuild) after changing them.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase setup (Auth project)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run in the Supabase SQL Editor:
 
-## Learn More
+1. `supabase/auth-setup.sql` — role + recruiter company trigger and the `company_name_taken` check (safe to re-run).
+2. `supabase/backfill-company-ids.sql` — once, to give recruiters registered before company ids a company. They must sign in again afterwards.
 
-To learn more about Next.js, take a look at the following resources:
+Each recruiter account gets its own company (`co-<name>-<6 hex>`, e.g. `co-acme-corp-7f3a9c`); company names are unique.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Jobs created while the gateway still used the mock company (co-brightline) stay under that demo company and can no longer be edited by any recruiter; reseed or delete them in a dev database. The seeded Brightline jobs remain visible to seekers as demo data.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm test` | Unit tests (vitest): mappers, API clients, form validation |
+| `npm run lint` | ESLint |
+| `npx tsx scripts/e2e-smoke.ts` | End-to-end smoke test through the running API Gateway and services (including the Application Service). Needs `SMOKE_SEEKER_EMAIL`, `SMOKE_SEEKER_PASSWORD`, `SMOKE_RECRUITER_EMAIL`, `SMOKE_RECRUITER_PASSWORD` (existing Supabase accounts; the recruiter must have a company id — see Supabase setup); deletes the seeker's profile and leaves one closed test job |

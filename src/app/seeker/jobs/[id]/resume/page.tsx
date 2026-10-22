@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { applicationService, candidateProfile, jobDiscovery, jobPosting, MockApiError, resumePreparation } from "@/lib/api";
+import { applicationService, candidateProfile, jobDiscovery, jobPosting, resumePreparation } from "@/lib/api";
+import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { useAsync } from "@/lib/use-async";
 import { cn } from "@/lib/utils";
 import type { JobWithCompany, ResumeFormat } from "@/lib/types";
@@ -205,15 +206,16 @@ export default function ResumeTailorPage() {
       toast.success(`Application sent to ${job?.company.name ?? "the company"}`);
       router.push(`/seeker/applications?submitted=${application.id}`);
     } catch (e) {
-      setSubmitError(e instanceof MockApiError || e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      setSubmitError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  const formatOptions: { value: ResumeFormat; label: string; hint: string }[] = job?.resumeTemplateName
+  const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
+  const formatOptions: { value: ResumeFormat; label: string; hint: string }[] = hasTemplate
     ? [
-        { value: "company", label: `${job.company.name} company template`, hint: "Provided by the recruiter for this job" },
+        { value: "company", label: `${job!.company.name} company template`, hint: "Provided by the recruiter for this job" },
         { value: "personal", label: "My default format", hint: "Your personal layout from your profile" },
       ]
     : [{ value: "personal", label: "My default format", hint: "Your personal layout from your profile" }];
@@ -232,6 +234,12 @@ export default function ResumeTailorPage() {
         <ListSkeleton rows={2} className="h-72" />
       ) : error ? (
         <ErrorState message={error.message} onRetry={reloadAll} />
+      ) : profile === null ? (
+        <CreateProfileBanner />
+      ) : job && job.status !== "OPEN" && !draft ? (
+        <p className="rounded-2xl border bg-card p-6 text-[15px] text-muted-foreground">
+          This job is no longer accepting applications.
+        </p>
       ) : job && profile ? (
         !draft ? (
           <GenerateCard job={job} generating={generating} onGenerate={handleGenerate} />
@@ -271,7 +279,7 @@ export default function ResumeTailorPage() {
                     </label>
                   ))}
                 </RadioGroup>
-                {!job.resumeTemplateName && (
+                {!hasTemplate && (
                   <p className="text-[13px] text-muted-foreground">
                     This job has no company template, so your default format is used.
                   </p>

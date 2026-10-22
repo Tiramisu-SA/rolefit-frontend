@@ -44,9 +44,10 @@ function LoginPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
   const copy = COPY[role];
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const nextErrors: { email?: string; password?: string } = {};
     if (!email.trim()) nextErrors.email = "Enter your email.";
@@ -54,7 +55,13 @@ function LoginPageInner() {
     setErrors(nextErrors);
     if (nextErrors.email || nextErrors.password) return;
 
-    signIn(role);
+    setSubmitting(true);
+    const error = await signIn(role, email.trim(), password);
+    setSubmitting(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
     toast.success("Signed in");
     router.push(role === "seeker" ? "/seeker/dashboard" : "/recruiter/dashboard");
   }
@@ -140,13 +147,11 @@ function LoginPageInner() {
               Keep me signed in
             </label>
 
-            <Button type="submit" size="lg" className="w-full">
-              {copy.signInLabel}
+            <Button type="submit" size="lg" className="w-full" disabled={submitting}>
+              {submitting ? "Signing in…" : copy.signInLabel}
               <ArrowRight className="size-4.5" aria-hidden />
             </Button>
           </form>
-
-          <p className="text-center text-sm text-muted-foreground">Demo mode: any email and password will work.</p>
 
           <p className="text-center text-[15px] text-muted-foreground">
             New to RoleFit?{" "}

@@ -1,77 +1,109 @@
-import type { Application, ApplicationStatus, ApplicationView } from "@/lib/types";
-import { computeMatch } from "./job-discovery";
-import { CURRENT_CANDIDATE_ID, MockApiError, newId, nowIso, simulate, store, withCompany } from "./_store";
+import { profileInitials } from "@/lib/profile";
+import type { Application, ApplicationStatus, ApplicationView, JobWithCompany, MatchSnapshot } from "@/lib/types";
+import { ApiError } from "./errors";
+import { gatewayRequest } from "./gateway";
+import * as jobPosting from "./job-posting";
 
-function view(a: Application): ApplicationView {
-  const job = store.jobs.find((j) => j.id === a.jobId);
-  const c = store.candidates.find((x) => x.id === a.candidateId);
-  if (!job || !c) throw new MockApiError("Application data is incomplete");
+// REST client for the Application Service, reached through the API Gateway
+// (/api/applications/*, same paths upstream). Submitting stores the approved
+// resume and a match snapshot on the server; a status change queues the email
+// that the Notification Service sends.
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Msg = Record<string, any>;
+
+const request = <T>(method: string, path: string, init: { json?: unknown; query?: URLSearchParams } = {}) =>
+  gatewayRequest<T>(method, `/api/applications${path}`, { ...init, serviceName: "application service" });
+
+const byUpdated = (a: Application, b: Application) => b.updatedAt.localeCompare(a.updatedAt);
+const scoreOf = (a: Application) => a.matchSnapshot?.score ?? -1;
+
+function toMatchSnapshot(raw: Msg | null | undefined): MatchSnapshot | null {
+  if (!raw || typeof raw.score !== "number") return null;
   return {
-    ...a,
-    job: withCompany(job),
-    candidate: { id: c.id, name: c.name, initials: c.initials, headline: c.headline, email: c.email },
+    score: raw.score,
+    summary: typeof raw.summary === "string" ? raw.summary : (raw.explanation ?? ""),
+    capturedAt: raw.capturedAt ?? raw.computedAt ?? "",
   };
 }
 
-/** Mirrors BUC-2C: validate job is open, require approved resume, snapshot the match result. */
-export function submitApplication(jobId: string): Promise<ApplicationView> {
-  return simulate(() => {
-    const job = store.jobs.find((j) => j.id === jobId);
-    if (!job || job.status !== "Published") throw new MockApiError("This job is no longer accepting applications");
-    const draft = store.resumeDrafts.find((r) => r.jobId === jobId && r.candidateId === CURRENT_CANDIDATE_ID && r.approved);
-    if (!draft) throw new MockApiError("Approve your resume before applying");
-    if (store.applications.some((a) => a.jobId === jobId && a.candidateId === CURRENT_CANDIDATE_ID)) {
-      throw new MockApiError("You've already applied to this job");
+/** The service's application → the frontend type. The service keeps only the candidate's name and email. */
+export function toApplication(raw: Msg): Application {
+  const name: string = raw.candidate?.name ?? "";
+  return {
+    id: raw.id,
+    jobId: raw.jobId,
+    candidateId: raw.candidateId,
+    candidate: { id: raw.candidate?.id ?? raw.candidateId, name, initials: profileInitials(name), headline: "", email: raw.candidate?.email ?? "" },
+    resumeDraftId: raw.resumeReference?.draftId ?? "",
+    resumeFormat: raw.resumeReference?.format === "company" ? "company" : "personal",
+    status: raw.status,
+    submittedAt: raw.submittedAt,
+    updatedAt: raw.updatedAt,
+    matchSnapshot: toMatchSnapshot(raw.matchSnapshot),
+    history: (raw.history ?? []).map((h: Msg) => ({ status: h.status, at: h.at, ...(h.note ? { note: h.note } : {}) })),
+  };
+}
+
+/**
+ * Loads the jobs the seeker's applications refer to: one call for open jobs,
+ * then one per closed job. Jobs that no longer exist are left out.
+ */
+async function jobsFor(ids: string[]): Promise<Map<string, JobWithCompany>> {
+  const byId = new Map((await jobPosting.listOpenJobs()).map((j) => [j.id, j]));
+  for (const id of ids) {
+    if (byId.has(id)) continue;
+    try {
+      byId.set(id, await jobPosting.getJob(id));
+    } catch (e) {
+      if (!(e instanceof ApiError && e.code === "NOT_FOUND")) throw e;
     }
-    const profile = store.candidates.find((c) => c.id === CURRENT_CANDIDATE_ID)!;
-    const match = computeMatch(profile, job);
-    const at = nowIso();
-    const app: Application = {
-      id: newId("app"), jobId, candidateId: CURRENT_CANDIDATE_ID, resumeDraftId: draft.id, resumeFormat: draft.format,
-      status: "Submitted", submittedAt: at, updatedAt: at,
-      matchSnapshot: { score: match.score, summary: match.explanation, capturedAt: at },
-      history: [{ status: "Submitted", at }],
-    };
-    store.applications.push(app);
-    return view(app);
-  }, 900);
+  }
+  return byId;
 }
 
-export function getApplication(id: string): Promise<ApplicationView> {
-  return simulate(() => {
-    const a = store.applications.find((x) => x.id === id);
-    if (!a) throw new MockApiError("Application not found");
-    return view(a);
-  });
+/**
+ * Applies to an open job with the approved resume; the service snapshots the resume and the match.
+ * The job is fetched first so a lookup failure happens before anything is saved.
+ */
+export async function submitApplication(jobId: string, coverLetter?: string): Promise<ApplicationView> {
+  const job = await jobPosting.getJob(jobId);
+  const body = coverLetter?.trim() ? { jobId, coverLetter: coverLetter.trim() } : { jobId };
+  const { application } = await request<{ application: Msg }>("POST", "", { json: body });
+  return { ...toApplication(application), job };
 }
 
-export function listMyApplications(): Promise<ApplicationView[]> {
-  return simulate(() =>
-    store.applications
-      .filter((a) => a.candidateId === CURRENT_CANDIDATE_ID)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map(view),
-  );
+export async function listMyApplications(): Promise<ApplicationView[]> {
+  const { applications } = await request<{ applications: Msg[] }>("GET", "/mine");
+  const mine = applications.map(toApplication);
+  const jobs = await jobsFor([...new Set(mine.map((a) => a.jobId))]);
+  return mine
+    .filter((a) => jobs.has(a.jobId))
+    .sort(byUpdated)
+    .map((a) => ({ ...a, job: jobs.get(a.jobId)! }));
 }
 
-export function listApplicantsForJob(jobId: string): Promise<ApplicationView[]> {
-  return simulate(() =>
-    store.applications
-      .filter((a) => a.jobId === jobId)
-      .sort((a, b) => b.matchSnapshot.score - a.matchSnapshot.score)
-      .map(view),
-  );
+/** Applicants for one of the recruiter's jobs (the caller already has the job), best match first. */
+export async function listApplicantsForJob(job: JobWithCompany): Promise<ApplicationView[]> {
+  const { applications } = await request<{ applications: Msg[] }>("GET", "", { query: new URLSearchParams({ jobId: job.id }) });
+  return applications
+    .map(toApplication)
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
+    .map((a) => ({ ...a, job }));
 }
 
-/** Also stands in for Notification Adapter sendStatusNotification() — the UI shows a toast. */
-export function updateApplicationStatus(id: string, status: ApplicationStatus, note?: string): Promise<ApplicationView> {
-  return simulate(() => {
-    const a = store.applications.find((x) => x.id === id);
-    if (!a) throw new MockApiError("Application not found");
-    const at = nowIso();
-    a.status = status;
-    a.updatedAt = at;
-    a.history.push({ status, at, note: note?.trim() || undefined });
-    return view(a);
-  });
+/**
+ * Changes the status; the Application Service queues the candidate's notification email.
+ * Pass the job when the caller already has it: that avoids a second request after the change is saved.
+ */
+export async function updateApplicationStatus(
+  id: string,
+  status: ApplicationStatus,
+  note?: string,
+  job?: JobWithCompany,
+): Promise<ApplicationView & { notificationQueued: boolean }> {
+  const body = note?.trim() ? { status, note: note.trim() } : { status };
+  const res = await request<{ application: Msg; notificationQueued?: boolean }>("PATCH", `/${encodeURIComponent(id)}/status`, { json: body });
+  const updated = toApplication(res.application);
+  return { ...updated, job: job ?? (await jobPosting.getMyJob(updated.jobId)), notificationQueued: Boolean(res.notificationQueued) };
 }

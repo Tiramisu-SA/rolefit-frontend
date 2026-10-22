@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Award, Briefcase, Gauge, Inbox, Sparkles } from "lucide-react";
 import { JobCard } from "@/components/seeker/job-card";
+import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { CompanyAvatar } from "@/components/brand/company-avatar";
 import { StatusBadge } from "@/components/brand/status-badge";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/brand/page-states";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useAsync } from "@/lib/use-async";
 import { useRole } from "@/lib/auth/role-context";
+import { profileCompleteness } from "@/lib/profile";
 import { candidateProfile, jobDiscovery, applicationService } from "@/lib/api";
 import type { ApplicationStatus } from "@/lib/types";
 
@@ -28,6 +30,7 @@ export default function SeekerDashboardPage() {
   const activeCount = applicationsState.data?.filter((a) => ACTIVE_STATUSES.includes(a.status)).length;
   const offerCount = applicationsState.data?.filter((a) => a.status === "Offer").length;
   const recentApplications = applicationsState.data?.slice(0, 3) ?? [];
+  const completeness = profileState.data ? profileCompleteness(profileState.data) : 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -35,6 +38,8 @@ export default function SeekerDashboardPage() {
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-[28px]">Good to see you, {firstName}</h1>
         <p className="text-[15px] text-muted-foreground">Here&apos;s what&apos;s new for you today.</p>
       </div>
+
+      {profileState.data === null && <CreateProfileBanner />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -54,8 +59,8 @@ export default function SeekerDashboardPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <span className="text-2xl font-extrabold">{profileState.data?.completeness ?? 0}%</span>
-                <Progress value={profileState.data?.completeness ?? 0} />
+                <span className="text-2xl font-extrabold">{completeness}%</span>
+                <Progress value={completeness} />
               </div>
             )}
             <Link href="/seeker/profile" className="text-sm font-semibold text-primary hover:underline">

@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { jobPosting, applicationService, CURRENT_COMPANY_ID } from "@/lib/api";
+import { jobPosting, applicationService } from "@/lib/api";
+import { WORK_ARRANGEMENT_LABEL, formatLocation } from "@/lib/labels";
 import { formatDate } from "@/lib/utils";
 import type { JobStatus, JobWithCompany } from "@/lib/types";
 
@@ -21,17 +22,21 @@ export interface JobRow {
   avgMatch: number | null;
 }
 
+/** Rounded mean, or null for none (applications without a match snapshot are left out). */
+const average = (scores: number[]): number | null =>
+  scores.length ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : null;
+
 export async function loadJobRows(): Promise<JobRow[]> {
-  const jobs = await jobPosting.listJobs({ companyId: CURRENT_COMPANY_ID });
+  const jobs = await jobPosting.listMyJobs();
   return Promise.all(
     jobs.map(async (job) => {
-      const apps = await applicationService.listApplicantsForJob(job.id);
+      const apps = await applicationService.listApplicantsForJob(job);
       return {
         job,
         applicants: apps.length,
         newApplicants: apps.filter((a) => a.status === "Submitted").length,
         interviews: apps.filter((a) => a.status === "Interview").length,
-        avgMatch: apps.length ? Math.round(apps.reduce((s, a) => s + a.matchSnapshot.score, 0) / apps.length) : null,
+        avgMatch: average(apps.flatMap((a) => (a.matchSnapshot ? [a.matchSnapshot.score] : []))),
       };
     }),
   );
@@ -47,8 +52,8 @@ export interface JobStats {
 }
 
 export function computeJobStats(rows: JobRow[]): JobStats {
-  const openPostings = rows.filter((r) => r.job.status === "Published").length;
-  const draftCount = rows.filter((r) => r.job.status === "Draft").length;
+  const openPostings = rows.filter((r) => r.job.status === "OPEN").length;
+  const draftCount = rows.filter((r) => r.job.status === "DRAFT").length;
   const totalApplicants = rows.reduce((s, r) => s + r.applicants, 0);
   const newApplicants = rows.reduce((s, r) => s + r.newApplicants, 0);
   const inInterview = rows.reduce((s, r) => s + r.interviews, 0);
@@ -63,15 +68,18 @@ export function computeJobStats(rows: JobRow[]): JobStats {
   };
 }
 
-const ACTION_LABEL: Record<JobStatus, string> = { Draft: "Publish", Published: "Close", Closed: "Reopen" };
+const ACTION_LABEL: Record<JobStatus, string> = { DRAFT: "Publish", OPEN: "Close", CLOSED: "Reopen" };
 
 export function JobsTable({
   rows,
   onAction,
+  onDelete,
   pendingJobId,
 }: {
   rows: JobRow[];
   onAction: (job: JobWithCompany) => void;
+  /** Only offered for drafts. */
+  onDelete: (job: JobWithCompany) => void;
   pendingJobId?: string | null;
 }) {
   return (
@@ -93,11 +101,12 @@ export function JobsTable({
             <TableRow key={job.id}>
               <TableCell className="px-5 py-4">
                 <div className="flex flex-col gap-0.5">
-                  <Link href={`/recruiter/jobs/${job.id}/applicants`} className="text-[15px] font-bold text-foreground hover:text-primary">
+                  <Link href={`/recruiter/jobs/${job.id}/edit`} className="text-[15px] font-bold text-foreground hover:text-primary">
                     {job.title}
                   </Link>
                   <span className="text-muted-foreground">
-                    {job.team} · {job.location} · {job.arrangement}
+                    {[formatLocation(job.location), job.workArrangement && WORK_ARRANGEMENT_LABEL[job.workArrangement]].filter(Boolean).join(" · ") ||
+                      "Location not set"}
                   </span>
                 </div>
               </TableCell>
@@ -109,8 +118,10 @@ export function JobsTable({
                 {newApplicants > 0 && <span className="ml-2 text-xs font-bold text-primary-soft-foreground">+{newApplicants} new</span>}
               </TableCell>
               <TableCell className="font-semibold text-foreground/80">{avgMatch !== null ? `${avgMatch}%` : "—"}</TableCell>
-              <TableCell className="text-foreground/80">{job.resumeTemplateName ? "Attached" : "None"}</TableCell>
-              <TableCell className="text-foreground/80">{job.deadline ? formatDate(job.deadline) : "Not set"}</TableCell>
+              <TableCell className="text-foreground/80">{job.applicationSettings.resumeTemplateId ? "Attached" : "None"}</TableCell>
+              <TableCell className="text-foreground/80">
+                {job.applicationSettings.applicationDeadline ? formatDate(job.applicationSettings.applicationDeadline) : "Not set"}
+              </TableCell>
               <TableCell className="px-5 py-4">
                 <div className="flex justify-end gap-2">
                   <Button
@@ -127,8 +138,13 @@ export function JobsTable({
                       <MoreHorizontal className="size-4" aria-hidden />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem render={<Link href={`/recruiter/jobs/${job.id}/applicants`} />}>Applicants</DropdownMenuItem>
                       <DropdownMenuItem render={<Link href={`/recruiter/jobs/${job.id}/edit`} />}>Edit</DropdownMenuItem>
-                      <DropdownMenuItem render={<Link href={`/recruiter/jobs/${job.id}/applicants`} />}>View applicants</DropdownMenuItem>
+                      {job.status === "DRAFT" && (
+                        <DropdownMenuItem variant="destructive" onClick={() => onDelete(job)}>
+                          Delete draft
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

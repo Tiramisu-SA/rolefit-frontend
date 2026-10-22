@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ListFilter, MapPin, Search, SearchX } from "lucide-react";
 import { JobCard } from "@/components/seeker/job-card";
 import { JobFilters } from "@/components/seeker/job-filters";
+import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/brand/page-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAsync } from "@/lib/use-async";
+import { profileCompleteness } from "@/lib/profile";
 import { candidateProfile, jobDiscovery } from "@/lib/api";
 import type { JobSearchFilters, JobWithMatch } from "@/lib/types";
 
@@ -38,9 +40,12 @@ function countActiveFilters(filters: JobSearchFilters): number {
 function sortJobs(jobs: JobWithMatch[], sort: SortOption): JobWithMatch[] {
   const sorted = [...jobs];
   if (sort === "recent") {
-    sorted.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
+    const posted = (j: JobWithMatch) => new Date(j.publishedAt ?? j.createdAt).getTime();
+    sorted.sort((a, b) => posted(b) - posted(a));
   } else if (sort === "salary") {
-    sorted.sort((a, b) => (b.salaryMax ?? b.salaryMin ?? 0) - (a.salaryMax ?? a.salaryMin ?? 0));
+    // Hidden salaries sort last.
+    const pay = (j: JobWithMatch) => (j.salary.visible ? (j.salary.maximum ?? j.salary.minimum ?? 0) : -1);
+    sorted.sort((a, b) => pay(b) - pay(a));
   } else {
     sorted.sort((a, b) => b.match.score - a.match.score);
   }
@@ -105,6 +110,7 @@ function JobsPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
+      {profileState.data === null && <CreateProfileBanner />}
       <div className="flex flex-col gap-5 rounded-2xl border bg-card p-6 md:p-7">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5">
@@ -114,7 +120,7 @@ function JobsPageInner() {
           {profileState.data?.verified && (
             <span className="flex items-center gap-2 rounded-xl bg-match-strong-soft px-3.5 py-2.5 text-sm font-semibold text-match-strong">
               <CheckCircle2 className="size-4.5" aria-hidden />
-              Profile verified · {profileState.data.completeness}% complete
+              Profile verified · {profileCompleteness(profileState.data)}% complete
             </span>
           )}
         </div>

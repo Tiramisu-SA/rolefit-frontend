@@ -15,9 +15,9 @@ import { useAsync } from "@/lib/use-async";
 import { jobPosting } from "@/lib/api";
 import type { JobWithCompany } from "@/lib/types";
 
-type TabValue = "all" | "Published" | "Draft" | "Closed";
+type TabValue = "all" | "OPEN" | "DRAFT" | "CLOSED";
 
-const TAB_LABEL: Record<TabValue, string> = { all: "All", Published: "Published", Draft: "Draft", Closed: "Closed" };
+const TAB_LABEL: Record<TabValue, string> = { all: "All", OPEN: "Open", DRAFT: "Draft", CLOSED: "Closed" };
 
 function matchesTab(row: JobRow, tab: TabValue): boolean {
   return tab === "all" || row.job.status === tab;
@@ -31,13 +31,14 @@ export default function RecruiterJobsPage() {
   const [query, setQuery] = useState("");
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [closeTarget, setCloseTarget] = useState<JobWithCompany | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<JobWithCompany | null>(null);
 
   const counts = useMemo(
     () => ({
       all: rows.length,
-      Published: rows.filter((r) => r.job.status === "Published").length,
-      Draft: rows.filter((r) => r.job.status === "Draft").length,
-      Closed: rows.filter((r) => r.job.status === "Closed").length,
+      OPEN: rows.filter((r) => r.job.status === "OPEN").length,
+      DRAFT: rows.filter((r) => r.job.status === "DRAFT").length,
+      CLOSED: rows.filter((r) => r.job.status === "CLOSED").length,
     }),
     [rows],
   );
@@ -63,9 +64,9 @@ export default function RecruiterJobsPage() {
   }
 
   function handleAction(job: JobWithCompany) {
-    if (job.status === "Draft") {
+    if (job.status === "DRAFT") {
       void runAction(job.id, "Job published", jobPosting.publishJob);
-    } else if (job.status === "Published") {
+    } else if (job.status === "OPEN") {
       setCloseTarget(job);
     } else {
       void runAction(job.id, "Job reopened", jobPosting.reopenJob);
@@ -77,6 +78,13 @@ export default function RecruiterJobsPage() {
     const job = closeTarget;
     setCloseTarget(null);
     await runAction(job.id, "Job closed", jobPosting.closeJob);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const job = deleteTarget;
+    setDeleteTarget(null);
+    await runAction(job.id, "Draft deleted", jobPosting.deleteJob);
   }
 
   return (
@@ -147,7 +155,7 @@ export default function RecruiterJobsPage() {
         ) : filtered.length === 0 ? (
           <p className="px-6 py-10 text-center text-sm text-muted-foreground">No postings match this view.</p>
         ) : (
-          <JobsTable rows={filtered} onAction={handleAction} pendingJobId={pendingJobId} />
+          <JobsTable rows={filtered} onAction={handleAction} onDelete={setDeleteTarget} pendingJobId={pendingJobId} />
         )}
       </section>
 
@@ -163,6 +171,23 @@ export default function RecruiterJobsPage() {
             </Button>
             <Button type="button" variant="destructive" size="lg" onClick={() => void confirmClose()}>
               Close posting
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this draft?</DialogTitle>
+            <DialogDescription>The draft and its resume template will be deleted. This can&apos;t be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" size="lg" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" size="lg" onClick={() => void confirmDelete()}>
+              Delete draft
             </Button>
           </DialogFooter>
         </DialogContent>
