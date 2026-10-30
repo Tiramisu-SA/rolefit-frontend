@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { FileText, Loader2 } from "lucide-react";
@@ -15,6 +15,10 @@ import type { ApplicationStatus, ApplicationView } from "@/lib/types";
 const STATUS_OPTIONS: ApplicationStatus[] = ["Under review", "Interview", "Offer", "Rejected"];
 
 export function ApplicantDetail({ application, onUpdated }: { application: ApplicationView; onUpdated: (a: ApplicationView) => void }) {
+  // The applicants page can render this twice (side panel + mobile sheet), so ids must be unique per instance.
+  const uid = useId();
+  const noteId = `${uid}-note`;
+  const coverLetterTitleId = `${uid}-cover-letter`;
   const [selectedStatus, setSelectedStatus] = useState<ApplicationStatus | undefined>(
     STATUS_OPTIONS.includes(application.status) ? application.status : undefined,
   );
@@ -95,6 +99,19 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
         <p className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">No match snapshot was stored for this application.</p>
       )}
 
+      {application.coverLetter ? (
+        <section aria-labelledby={coverLetterTitleId} className="flex flex-col gap-2 rounded-2xl border p-4">
+          <h3 id={coverLetterTitleId} className="text-sm font-bold text-foreground">
+            Cover letter
+          </h3>
+          <p className="max-h-72 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-foreground/85 [overflow-wrap:anywhere]">
+            {application.coverLetter}
+          </p>
+        </section>
+      ) : (
+        <p className="text-sm text-muted-foreground">No cover letter was sent with this application.</p>
+      )}
+
       <button
         type="button"
         onClick={() => toast.info("Resume viewer is not connected yet")}
@@ -140,11 +157,11 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
       </fieldset>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="applicant-note" className="text-sm font-bold">
+        <label htmlFor={noteId} className="text-sm font-bold">
           Note <span className="font-medium text-muted-foreground">(optional)</span>
         </label>
         <Textarea
-          id="applicant-note"
+          id={noteId}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}

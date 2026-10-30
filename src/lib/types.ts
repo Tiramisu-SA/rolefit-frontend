@@ -304,6 +304,8 @@ export interface Application {
   updatedAt: string;
   /** Captured at submission; null for applications stored without one. */
   matchSnapshot: MatchSnapshot | null;
+  /** Trimmed text the seeker sent with the application; null when none was sent. */
+  coverLetter: string | null;
   history: StatusChange[];
 }
 

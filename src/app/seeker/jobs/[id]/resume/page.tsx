@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { applicationService, candidateProfile, jobDiscovery, jobPosting, resumePreparation } from "@/lib/api";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { useAsync } from "@/lib/use-async";
@@ -106,6 +107,7 @@ export default function ResumeTailorPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -202,7 +204,7 @@ export default function ResumeTailorPage() {
     setSubmitError(null);
     try {
       await resumePreparation.approveResume(id);
-      const application = await applicationService.submitApplication(id);
+      const application = await applicationService.submitApplication(id, coverLetter);
       toast.success(`Application sent to ${job?.company.name ?? "the company"}`);
       router.push(`/seeker/applications?submitted=${application.id}`);
     } catch (e) {
@@ -211,6 +213,9 @@ export default function ResumeTailorPage() {
       setSubmitting(false);
     }
   }
+
+  const coverLetterRequired = Boolean(job?.applicationSettings.requireCoverLetter);
+  const coverLetterMissing = coverLetterRequired && coverLetter.trim() === "";
 
   const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
   const formatOptions: { value: ResumeFormat; label: string; hint: string }[] = hasTemplate
@@ -383,7 +388,7 @@ export default function ResumeTailorPage() {
           if (!submitting) setSubmitOpen(open);
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Submit your application?</DialogTitle>
             <DialogDescription>
@@ -397,6 +402,31 @@ export default function ResumeTailorPage() {
             </p>
           )}
 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="cover-letter" className="text-sm font-bold">
+              Cover letter{" "}
+              <span className="font-normal text-muted-foreground">{coverLetterRequired ? "(required for this job)" : "(optional)"}</span>
+            </Label>
+            <Textarea
+              id="cover-letter"
+              value={coverLetter}
+              onChange={(e) => setCoverLetter(e.target.value)}
+              maxLength={applicationService.COVER_LETTER_MAX_LENGTH}
+              required={coverLetterRequired}
+              aria-required={coverLetterRequired}
+              aria-describedby="cover-letter-hint"
+              disabled={submitting}
+              placeholder={`Tell ${job?.company.name ?? "the recruiter"} why you're a good fit for this role.`}
+              className="max-h-64 min-h-28"
+            />
+            <span id="cover-letter-hint" className="flex justify-between gap-3 text-xs text-muted-foreground">
+              <span>{coverLetterRequired ? "This job asks for a cover letter. Write a few sentences to submit." : "Sent to the recruiter with your resume."}</span>
+              <span className="tabular-nums">
+                {coverLetter.length.toLocaleString("en-US")} / {applicationService.COVER_LETTER_MAX_LENGTH.toLocaleString("en-US")}
+              </span>
+            </span>
+          </div>
+
           <div className="flex items-center gap-2.5">
             <Checkbox id="reviewed-check" checked={reviewed} onCheckedChange={(checked) => setReviewed(checked === true)} />
             <Label htmlFor="reviewed-check" className="cursor-pointer text-[15px] font-normal">
@@ -406,7 +436,7 @@ export default function ResumeTailorPage() {
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" size="lg" disabled={submitting} />}>Cancel</DialogClose>
-            <Button type="button" size="lg" disabled={!reviewed || submitting} onClick={handleSubmit}>
+            <Button type="button" size="lg" disabled={!reviewed || coverLetterMissing || submitting} onClick={handleSubmit}>
               {submitting && <Loader2 className="size-4 animate-spin" aria-hidden />}
               Submit application
             </Button>

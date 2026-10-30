@@ -41,6 +41,7 @@ export function toApplication(raw: Msg): Application {
     submittedAt: raw.submittedAt,
     updatedAt: raw.updatedAt,
     matchSnapshot: toMatchSnapshot(raw.matchSnapshot),
+    coverLetter: typeof raw.coverLetter === "string" && raw.coverLetter ? raw.coverLetter : null,
     history: (raw.history ?? []).map((h: Msg) => ({ status: h.status, at: h.at, ...(h.note ? { note: h.note } : {}) })),
   };
 }
@@ -61,6 +62,9 @@ async function jobsFor(ids: string[]): Promise<Map<string, JobWithCompany>> {
   }
   return byId;
 }
+
+/** The Application Service's limit for `coverLetter` (characters, after trimming). */
+export const COVER_LETTER_MAX_LENGTH = 10_000;
 
 /**
  * Applies to an open job with the approved resume; the service snapshots the resume and the match.

@@ -47,8 +47,14 @@ describe("toApplication", () => {
       resumeDraftId: "draft_9", resumeFormat: "company", status: "Submitted",
       submittedAt: "2026-10-02T00:00:00.000Z", updatedAt: "2026-10-02T00:00:00.000Z",
       matchSnapshot: { score: 72, summary: "Good fit", capturedAt: "2026-10-02T00:00:00.000Z" },
+      coverLetter: null,
       history: [{ status: "Submitted", at: "2026-10-02T00:00:00.000Z" }],
     });
+  });
+
+  it("keeps the cover letter the seeker sent, and treats an empty one as none", () => {
+    expect(applications.toApplication(rawApp({ coverLetter: "Dear team,\nI'd love to join." })).coverLetter).toBe("Dear team,\nI'd love to join.");
+    expect(applications.toApplication(rawApp({ coverLetter: "" })).coverLetter).toBeNull();
   });
 
   it("handles legacy rows without resume or match snapshots", () => {
@@ -72,6 +78,17 @@ describe("application client", () => {
     expect(JSON.parse(init.body)).toEqual({ jobId: "job_1" });
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
     expect(view).toMatchObject({ id: "app_1", job: { id: "job_1" } });
+  });
+
+  it("sends a trimmed cover letter, and leaves a blank one out", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url.startsWith(`${GW}/api/applications`) ? jsonResponse(201, { application: rawApp() }) : jsonResponse(200, { job: protoJob("job_1") }),
+    );
+    await applications.submitApplication("job_1", "  Hello, I'm a great fit.  ");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ jobId: "job_1", coverLetter: "Hello, I'm a great fit." });
+    fetchMock.mockClear();
+    await applications.submitApplication("job_1", "   ");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ jobId: "job_1" });
   });
 
   it("does not submit when the job cannot be fetched", async () => {
