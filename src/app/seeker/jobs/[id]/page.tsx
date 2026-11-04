@@ -16,6 +16,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { applicationService, candidateProfile, jobDiscovery } from "@/lib/api";
 import { EMPLOYMENT_TYPE_LABEL, WORK_ARRANGEMENT_LABEL, experienceLevelFor, formatLocation, formatSalary, requirementLines } from "@/lib/labels";
+import { acceptingApplications } from "@/lib/job-list";
 import { useAsync } from "@/lib/use-async";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -134,9 +135,9 @@ export default function JobDetailPage() {
                       View application
                     </Link>
                   </div>
-                ) : job.status !== "OPEN" ? (
+                ) : !acceptingApplications(job) ? (
                   <span className="rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-muted-foreground">
-                    No longer accepting applications
+                    {job.status === "OPEN" && deadline ? `Applications closed on ${formatDate(deadline)}` : "No longer accepting applications"}
                   </span>
                 ) : (
                   <Link href={`/seeker/jobs/${id}/resume`} className={buttonVariants({ size: "lg" })}>
@@ -152,7 +153,7 @@ export default function JobDetailPage() {
                   </span>
                 )}
 
-                {deadline && job.status === "OPEN" && (
+                {deadline && acceptingApplications(job) && (
                   <span className="ml-auto text-sm font-semibold text-match-good">Apply by {formatDate(deadline)}</span>
                 )}
               </div>

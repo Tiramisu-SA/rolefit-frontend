@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, ListFilter, MapPin, Search, SearchX } from "lucide-react";
+import { CheckCircle2, ListFilter, MapPin, Search, SearchX, Sparkles } from "lucide-react";
 import { JobCard } from "@/components/seeker/job-card";
 import { JobFilters } from "@/components/seeker/job-filters";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
@@ -15,12 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAsync } from "@/lib/use-async";
+import { emptyReason, jobsForTab, RECOMMENDED_MIN_SCORE, type JobTab } from "@/lib/job-list";
 import { profileCompleteness } from "@/lib/profile";
 import { candidateProfile, jobDiscovery } from "@/lib/api";
 import type { JobSearchFilters, JobWithMatch } from "@/lib/types";
 
 type SortOption = "best" | "recent" | "salary";
-type TabValue = "recommended" | "all";
 
 const SORT_LABEL: Record<SortOption, string> = {
   best: "Best match",
@@ -62,7 +62,7 @@ function JobsPageInner() {
   }));
   const [keyword, setKeyword] = useState(filters.query ?? "");
   const [location, setLocation] = useState(filters.location ?? "");
-  const [tab, setTab] = useState<TabValue>("recommended");
+  const [tab, setTab] = useState<JobTab>("recommended");
   const [sort, setSort] = useState<SortOption>("best");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -99,10 +99,7 @@ function JobsPageInner() {
   }
 
   const allJobs = useMemo(() => jobsState.data ?? [], [jobsState.data]);
-  const jobs = useMemo(() => {
-    const source = tab === "recommended" ? allJobs.filter((j) => j.match.score >= 60) : allJobs;
-    return sortJobs(source, sort);
-  }, [allJobs, tab, sort]);
+  const jobs = useMemo(() => sortJobs(jobsForTab(allJobs, tab), sort), [allJobs, tab, sort]);
 
   const activeFilterCount = countActiveFilters(filters);
 
@@ -180,7 +177,7 @@ function JobsPageInner() {
 
         <main className="flex flex-1 flex-col gap-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as JobTab)}>
               <TabsList>
                 <TabsTrigger value="recommended">Recommended for you</TabsTrigger>
                 <TabsTrigger value="all">All jobs</TabsTrigger>
@@ -195,7 +192,7 @@ function JobsPageInner() {
                 </Label>
                 <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
                   <SelectTrigger id="jobs-sort" className="h-10">
-                    <SelectValue />
+                    <SelectValue>{(value: SortOption) => SORT_LABEL[value]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {(Object.keys(SORT_LABEL) as SortOption[]).map((option) => (
@@ -219,6 +216,17 @@ function JobsPageInner() {
                 <JobCard key={job.id} job={job} />
               ))}
             </div>
+          ) : emptyReason(allJobs, tab) === "no-strong-matches" ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No strong matches yet"
+              description={`We recommend jobs that match your profile at least ${RECOMMENDED_MIN_SCORE}%. You can still look through all open jobs, and adding skills or job preferences to your profile can raise your matches.`}
+              action={
+                <Button type="button" size="lg" onClick={() => setTab("all")}>
+                  Show all {allJobs.length} jobs
+                </Button>
+              }
+            />
           ) : (
             <EmptyState
               icon={SearchX}
