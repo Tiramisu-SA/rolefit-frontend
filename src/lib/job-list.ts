@@ -1,4 +1,4 @@
-import type { JobPosting, JobWithMatch } from "./types";
+import type { JobWithMatch } from "./types";
 
 export type JobTab = "recommended" | "all";
 
@@ -15,13 +15,4 @@ export function jobsForTab(jobs: JobWithMatch[], tab: JobTab): JobWithMatch[] {
  */
 export function emptyReason(allJobs: JobWithMatch[], tab: JobTab): "no-strong-matches" | "no-results" {
   return tab === "recommended" && allJobs.length > 0 ? "no-strong-matches" : "no-results";
-}
-
-/** Whether a job can be applied to now. Same rule as the Application Service, so nobody finds out only after preparing a resume. */
-export function acceptingApplications(job: Pick<JobPosting, "status" | "applicationSettings">, now: Date = new Date()): boolean {
-  if (job.status !== "OPEN") return false;
-  const deadline = job.applicationSettings.applicationDeadline;
-  if (!deadline) return true;
-  const time = Date.parse(deadline);
-  return Number.isNaN(time) || time > now.getTime();
 }

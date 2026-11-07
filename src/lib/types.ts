@@ -312,3 +312,33 @@ export interface Application {
 export interface ApplicationView extends Application {
   job: JobWithCompany;
 }
+
+// --- Company Service (REST) -----------------------------------------------------
+
+export const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-1000", "1000+"] as const;
+export type CompanySize = (typeof COMPANY_SIZES)[number] | "";
+
+/** A company's public profile, as saved by its recruiters. (`Company` above is only the avatar tile.) */
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  description: string;
+  website: string;
+  industry: string;
+  size: CompanySize;
+  location: string;
+  logoUrl: string;
+  updatedAt: string | null;
+}
+
+export type CompanyProfileInput = Omit<CompanyProfile, "id" | "name" | "updatedAt">;
+
+export interface RecruiterProfile {
+  userId: string;
+  companyId: string;
+  displayName: string;
+  jobTitle: string;
+  updatedAt: string | null;
+}
+
+export type RecruiterProfileInput = Pick<RecruiterProfile, "displayName" | "jobTitle">;

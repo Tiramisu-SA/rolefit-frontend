@@ -10,13 +10,14 @@ import { MatchBadge } from "@/components/brand/match-badge";
 import { MatchRing } from "@/components/brand/match-ring";
 import { ErrorState } from "@/components/brand/page-states";
 import { StatusBadge } from "@/components/brand/status-badge";
+import { CompanyCard } from "@/components/company/company-card";
 import { MatchPanel } from "@/components/seeker/match-panel";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { applicationService, candidateProfile, jobDiscovery } from "@/lib/api";
 import { EMPLOYMENT_TYPE_LABEL, WORK_ARRANGEMENT_LABEL, experienceLevelFor, formatLocation, formatSalary, requirementLines } from "@/lib/labels";
-import { acceptingApplications } from "@/lib/job-list";
+import { applicationState } from "@/lib/deadline";
 import { useAsync } from "@/lib/use-async";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -59,6 +60,7 @@ export default function JobDetailPage() {
   const myApplication = appsState.data?.find((a) => a.jobId === id);
   const lines = job ? requirementLines(job.requirements) : { required: [], preferred: [] };
   const deadline = job?.applicationSettings.applicationDeadline;
+  const applyState = job ? applicationState(job.status, deadline) : "closed";
 
   return (
     <div className="flex flex-col gap-5">
@@ -135,9 +137,9 @@ export default function JobDetailPage() {
                       View application
                     </Link>
                   </div>
-                ) : !acceptingApplications(job) ? (
+                ) : applyState !== "open" ? (
                   <span className="rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-muted-foreground">
-                    {job.status === "OPEN" && deadline ? `Applications closed on ${formatDate(deadline)}` : "No longer accepting applications"}
+                    {applyState === "deadline-passed" ? "Deadline passed · " : ""}No longer accepting applications
                   </span>
                 ) : (
                   <Link href={`/seeker/jobs/${id}/resume`} className={buttonVariants({ size: "lg" })}>
@@ -153,7 +155,7 @@ export default function JobDetailPage() {
                   </span>
                 )}
 
-                {deadline && acceptingApplications(job) && (
+                {deadline && applyState === "open" && (
                   <span className="ml-auto text-sm font-semibold text-match-good">Apply by {formatDate(deadline)}</span>
                 )}
               </div>
@@ -196,6 +198,8 @@ export default function JobDetailPage() {
                 </div>
               </div>
             </section>
+
+            <CompanyCard key={job.companyId} companyId={job.companyId} />
           </main>
 
           <aside aria-label="Your match" className="w-full lg:w-[440px] lg:shrink-0">
