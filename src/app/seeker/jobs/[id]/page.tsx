@@ -10,6 +10,7 @@ import { MatchBadge } from "@/components/brand/match-badge";
 import { MatchRing } from "@/components/brand/match-ring";
 import { ErrorState } from "@/components/brand/page-states";
 import { StatusBadge } from "@/components/brand/status-badge";
+import { CompanyCard } from "@/components/company/company-card";
 import { MatchPanel } from "@/components/seeker/match-panel";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -195,6 +196,8 @@ export default function JobDetailPage() {
                 </div>
               </div>
             </section>
+
+            <CompanyCard companyId={job.companyId} />
           </main>
 
           <aside aria-label="Your match" className="w-full lg:w-[440px] lg:shrink-0">
