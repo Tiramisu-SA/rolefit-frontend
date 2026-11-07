@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { href: "/recruiter/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recruiter/jobs", label: "Job postings", icon: Briefcase },
+  { href: "/recruiter/company", label: "Company profile", icon: Building2 },
 ];
 
 function initialsOf(name: string): string {
@@ -31,19 +32,6 @@ function initialsOf(name: string): string {
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
   return `${first}${last}`.toUpperCase();
-}
-
-function CompanyProfileItem() {
-  return (
-    <span
-      aria-disabled="true"
-      className="flex h-11 items-center gap-3 rounded-lg px-3 text-[15px] font-semibold text-muted-foreground/70"
-    >
-      <Building2 className="size-[19px]" aria-hidden />
-      Company profile
-      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">Soon</span>
-    </span>
-  );
 }
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
@@ -72,7 +60,6 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
           <div key={item.href}>{link}</div>
         );
       })}
-      <CompanyProfileItem />
     </nav>
   );
 }

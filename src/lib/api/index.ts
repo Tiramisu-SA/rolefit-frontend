@@ -3,4 +3,5 @@ export * as jobPosting from "./job-posting";
 export * as jobDiscovery from "./job-discovery";
 export * as resumePreparation from "./resume-preparation";
 export * as applicationService from "./application";
+export * as companyService from "./company";
 export { ApiError } from "./errors";
