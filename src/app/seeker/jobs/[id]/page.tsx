@@ -197,7 +197,7 @@ export default function JobDetailPage() {
               </div>
             </section>
 
-            <CompanyCard companyId={job.companyId} />
+            <CompanyCard key={job.companyId} companyId={job.companyId} />
           </main>
 
           <aside aria-label="Your match" className="w-full lg:w-[440px] lg:shrink-0">
