@@ -35,7 +35,9 @@ as $$
   );
 $$;
 
--- Lets the register page tell a recruiter the name is taken before signing up.
+-- Whether a recruiter already registered this company name. Used by the sign-up
+-- trigger below. Not callable from outside the database: the project keeps the
+-- Supabase Data API disabled, and the register page relies on the trigger's error.
 create or replace function public.company_name_taken(name text)
 returns boolean
 language sql
@@ -57,7 +59,7 @@ as $$
 $$;
 
 revoke all on function public.company_name_taken(text) from public;
-grant execute on function public.company_name_taken(text) to anon, authenticated;
+revoke execute on function public.company_name_taken(text) from anon, authenticated;
 
 -- A new company id for a name: co-<slug>-<6 hex>, retried until no user has it.
 create or replace function public.new_company_id(name text)

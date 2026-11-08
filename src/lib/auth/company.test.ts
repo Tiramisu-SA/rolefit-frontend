@@ -1,25 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { isCompanyNameTaken } from "./company";
+import { describe, expect, it } from "vitest";
+import { COMPANY_TAKEN_MESSAGE, signUpErrorMessage } from "./company";
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
-vi.mock("@/lib/auth/supabase", () => ({ supabase: { rpc } }));
-
-beforeEach(() => rpc.mockReset());
-
-describe("isCompanyNameTaken", () => {
-  it("asks Supabase whether a recruiter already registered the name", async () => {
-    rpc.mockResolvedValue({ data: true, error: null });
-    await expect(isCompanyNameTaken("Acme Corp")).resolves.toBe(true);
-    expect(rpc).toHaveBeenCalledWith("company_name_taken", { name: "Acme Corp" });
+describe("signUpErrorMessage", () => {
+  it("explains a recruiter sign-up refused by the database trigger as a taken company name", () => {
+    expect(signUpErrorMessage("recruiter", "Database error saving new user")).toBe(COMPANY_TAKEN_MESSAGE);
   });
 
-  it("returns false for a free name", async () => {
-    rpc.mockResolvedValue({ data: false, error: null });
-    await expect(isCompanyNameTaken("New Co")).resolves.toBe(false);
+  it("matches the trigger error regardless of case", () => {
+    expect(signUpErrorMessage("recruiter", "database error saving new user")).toBe(COMPANY_TAKEN_MESSAGE);
   });
 
-  it("throws when the check itself fails", async () => {
-    rpc.mockResolvedValue({ data: null, error: { message: "function not found" } });
-    await expect(isCompanyNameTaken("Acme Corp")).rejects.toThrow("function not found");
+  it("keeps other errors as Supabase wrote them", () => {
+    expect(signUpErrorMessage("recruiter", "User already registered")).toBe("User already registered");
+    expect(signUpErrorMessage("recruiter", "Password should be at least 6 characters")).toBe(
+      "Password should be at least 6 characters",
+    );
+  });
+
+  it("does not blame a company name for a job seeker sign-up", () => {
+    expect(signUpErrorMessage("seeker", "Database error saving new user")).toBe("Database error saving new user");
   });
 });

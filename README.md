@@ -37,7 +37,9 @@ NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 
 Run in the Supabase SQL Editor:
 
-1. `supabase/auth-setup.sql` — role + recruiter company trigger and the `company_name_taken` check (safe to re-run).
+1. `supabase/auth-setup.sql` — role + recruiter company trigger, which refuses a company name that is already registered (safe to re-run).
+
+The frontend uses only Supabase Auth (`/auth/v1`). Keep the Supabase **Data API disabled** (Integrations → Data API): RoleFit never calls `/rest/v1`. When the trigger refuses a recruiter sign-up, Supabase answers "Database error saving new user", which the register page shows as "This company name is already registered".
 2. `supabase/backfill-company-ids.sql` — once, to give recruiters registered before company ids a company. They must sign in again afterwards.
 
 Each recruiter account gets its own company (`co-<name>-<6 hex>`, e.g. `co-acme-corp-7f3a9c`); company names are unique.

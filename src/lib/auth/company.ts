@@ -1,12 +1,17 @@
-import { supabase } from "@/lib/auth/supabase";
+import type { Role } from "@/lib/types";
+
+export const COMPANY_TAKEN_MESSAGE = "This company name is already registered. Try a different name.";
 
 /**
- * Whether a recruiter already registered this company name (case- and
- * whitespace-insensitive). Calls the `company_name_taken` database function from
- * supabase/auth-setup.sql; the signup trigger enforces the same rule.
+ * The message to show when Supabase refuses a sign-up.
+ *
+ * The sign-up trigger in supabase/auth-setup.sql refuses a recruiter whose company
+ * name is already registered (or reserved for the demo companies), and Supabase
+ * reports any trigger error as "Database error saving new user". The register page
+ * does not check the name first: that would need the Supabase Data API, which this
+ * project keeps disabled.
  */
-export async function isCompanyNameTaken(name: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc("company_name_taken", { name });
-  if (error) throw new Error(error.message);
-  return data === true;
+export function signUpErrorMessage(role: Role, message: string): string {
+  if (role === "recruiter" && /database error saving new user/i.test(message)) return COMPANY_TAKEN_MESSAGE;
+  return message;
 }
