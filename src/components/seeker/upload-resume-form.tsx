@@ -78,7 +78,7 @@ export function UploadResumeForm({ job }: { job: JobWithCompany }) {
             This company provides a resume template. Download it, fill it in, then upload it here.
           </p>
           <DownloadTemplateButton jobId={job.id} variant="outline" />
-          <p className="text-xs text-muted-foreground">Prefer not to fill it in yourself? Go back and choose Tailor my resume with AI to get a tailored resume in this company's style.</p>
+          <p className="text-xs text-muted-foreground">Prefer not to fill it in yourself? Go back and choose Tailor my resume with AI to get a tailored resume in this company&apos;s style.</p>
         </div>
       )}
 
