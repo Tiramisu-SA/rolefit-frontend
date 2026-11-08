@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./errors";
-import { gatewayRequest } from "./gateway";
+import { fileNameFromContentDisposition, gatewayRequest } from "./gateway";
 
 const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
 vi.mock("@/lib/auth/supabase", () => ({ supabase: { auth: { getSession } } }));
@@ -82,5 +82,31 @@ describe("gatewayRequest", () => {
   it("fails with CONFIG_ERROR when the gateway URL is not configured", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_GATEWAY_URL", "");
     await expect(gatewayRequest("GET", "/api/jobs")).rejects.toMatchObject({ code: "CONFIG_ERROR" });
+  });
+});
+
+describe("fileNameFromContentDisposition", () => {
+  it("reads filename* alone, decoding it", () => {
+    expect(fileNameFromContentDisposition("attachment; filename*=UTF-8''My%20R%C3%A9sum%C3%A9.docx")).toBe("My Résumé.docx");
+  });
+  it("prefers filename* over filename", () => {
+    expect(fileNameFromContentDisposition("attachment; filename=\"plain.pdf\"; filename*=UTF-8''fancy.pdf")).toBe("fancy.pdf");
+  });
+  it("does not throw on malformed percent-encoding", () => {
+    expect(fileNameFromContentDisposition("attachment; filename=\"plain.pdf\"; filename*=UTF-8''%E0%A4%A")).toBe("plain.pdf");
+    expect(fileNameFromContentDisposition("attachment; filename*=UTF-8''%E0%A4%A")).toBeUndefined();
+  });
+  it("keeps only the base name of a path", () => {
+    expect(fileNameFromContentDisposition("attachment; filename*=UTF-8''..%2F..%2Fsecret.docx")).toBe("secret.docx");
+    expect(fileNameFromContentDisposition("attachment; filename=\"C:\\dir\\a.docx\"")).toBe("a.docx");
+  });
+  it("treats empty, . and .. as no name, and strips control characters", () => {
+    expect(fileNameFromContentDisposition("attachment; filename=\"..\"")).toBeUndefined();
+    expect(fileNameFromContentDisposition("attachment; filename=\".\"")).toBeUndefined();
+    expect(fileNameFromContentDisposition("attachment; filename=\"\"")).toBeUndefined();
+    expect(fileNameFromContentDisposition("attachment; filename*=UTF-8''a%00b%0A.docx")).toBe("ab.docx");
+  });
+  it("returns undefined without a header", () => {
+    expect(fileNameFromContentDisposition(null)).toBeUndefined();
   });
 });
