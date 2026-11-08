@@ -33,19 +33,26 @@ async function accessToken(): Promise<string | undefined> {
   return data.session?.access_token;
 }
 
+/** Keeps only a safe base name: after the last / or \\, no control characters; "", "." and ".." are no name. */
+function safeFileName(name: string): string | undefined {
+  const base = (name.split(/[/\\]/).pop() ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  return base === "" || base === "." || base === ".." ? undefined : base;
+}
+
 /** The file name from a Content-Disposition header (`filename*=UTF-8''...` first, then `filename=`), or undefined. */
 export function fileNameFromContentDisposition(header: string | null): string | undefined {
   if (!header) return undefined;
   const extended = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header)?.[1]?.trim();
   if (extended) {
     try {
-      return decodeURIComponent(extended);
+      const name = safeFileName(decodeURIComponent(extended));
+      if (name) return name;
     } catch {
-      // fall through to the plain filename
+      // malformed percent-encoding: fall through to the plain filename
     }
   }
   const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header);
-  return (plain?.[1] ?? plain?.[2])?.trim() || undefined;
+  return safeFileName(plain?.[1] ?? plain?.[2] ?? "");
 }
 
 /** The same as `gatewayRequest`, for a route that answers with a file: returns the bytes and the name the server gave it. */
