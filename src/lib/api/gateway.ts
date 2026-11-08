@@ -33,6 +33,25 @@ async function accessToken(): Promise<string | undefined> {
   return data.session?.access_token;
 }
 
+/** The same as `gatewayRequest`, for a route that answers with a file: returns the bytes. */
+export async function gatewayDownload(path: string, init: Pick<GatewayRequestInit, "serviceName"> = {}): Promise<Blob> {
+  const service = init.serviceName ?? "RoleFit server";
+  const headers = new Headers();
+  const token = await accessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${path}`, { method: "GET", headers });
+  } catch {
+    throw new ApiError("SERVICE_UNAVAILABLE", `Can't reach the ${service}. Please try again.`, 503);
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as ErrorBody | null;
+    throw new ApiError(data?.error?.code ?? "INTERNAL", data?.error?.message ?? `The ${service} returned an error (${res.status}).`, res.status, data?.error?.details);
+  }
+  return res.blob();
+}
+
 /** Calls `path` (e.g. "/api/candidates/profiles/me") on the gateway. Throws ApiError on failure. */
 export async function gatewayRequest<T>(method: string, path: string, init: GatewayRequestInit = {}): Promise<T> {
   const service = init.serviceName ?? "RoleFit server";

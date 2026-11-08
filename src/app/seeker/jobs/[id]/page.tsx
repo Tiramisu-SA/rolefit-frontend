@@ -144,7 +144,7 @@ export default function JobDetailPage() {
                 ) : (
                   <Link href={`/seeker/jobs/${id}/resume`} className={buttonVariants({ size: "lg" })}>
                     <Sparkles className="size-4.5" aria-hidden />
-                    Tailor resume &amp; apply
+                    Apply
                   </Link>
                 )}
 

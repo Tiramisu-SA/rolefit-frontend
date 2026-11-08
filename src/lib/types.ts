@@ -18,6 +18,8 @@ export type JobStatus = (typeof JOB_STATUSES)[number];
 export type ExperienceLevel = "Internship" | "Entry level" | "Mid level" | "Senior";
 export type ApplicationStatus = "Submitted" | "Under review" | "Interview" | "Offer" | "Rejected";
 export type ResumeFormat = "company" | "personal";
+/** Where an application's resume came from: tailored by RoleFit, or a file the candidate uploaded. */
+export type ResumeSource = "tailored" | "uploaded";
 export type MatchTier = "strong" | "good" | "partial";
 
 export interface Company {
@@ -292,6 +294,21 @@ export interface ApplicantSummary {
   email: string;
 }
 
+/** Details of a resume file a candidate uploaded; the bytes are only served by the download route. */
+export interface ApplicationResumeFile {
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+/** A section of the approved resume, as stored with a tailored application. */
+export interface ResumeSnapshotSection {
+  id: string;
+  title: string;
+  meta: string;
+  bullets: { id: string; text: string }[];
+}
+
 export interface Application {
   id: string;
   jobId: string;
@@ -299,6 +316,11 @@ export interface Application {
   candidate: ApplicantSummary;
   resumeDraftId: string;
   resumeFormat: ResumeFormat;
+  resumeSource: ResumeSource;
+  /** Set when resumeSource is "uploaded". */
+  resumeFile: ApplicationResumeFile | null;
+  /** The approved resume's sections for tailored applications; null when none were returned. */
+  resumeSnapshot: ResumeSnapshotSection[] | null;
   status: ApplicationStatus;
   submittedAt: string;
   updatedAt: string;

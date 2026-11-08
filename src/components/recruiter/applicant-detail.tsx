@@ -5,10 +5,12 @@ import type { KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService } from "@/lib/api";
 import { MATCH_TIER_CLASS, matchTier } from "@/lib/match";
+import { formatFileSize } from "@/lib/resume-file";
 import { cn, formatDate } from "@/lib/utils";
 import type { ApplicationStatus, ApplicationView } from "@/lib/types";
 
@@ -28,7 +30,14 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
 
   const snapshot = application.matchSnapshot;
   const firstName = application.candidate.name.trim().split(/\s+/)[0] ?? application.candidate.name;
-  const resumeLabel = application.resumeFormat === "company" ? "Company template" : "Personal format";
+  const uploadedFile = application.resumeSource === "uploaded" ? application.resumeFile : null;
+  const hasTemplate = Boolean(application.job.applicationSettings.resumeTemplateId);
+  const resumeLabel = uploadedFile
+    ? `Uploaded by candidate · ${uploadedFile.fileName} (${formatFileSize(uploadedFile.sizeBytes)})${hasTemplate ? " (company template not used)" : ""}`
+    : `${application.resumeFormat === "company" ? "Company template" : "Personal format"} · approved by candidate`;
+  const canViewResume = uploadedFile !== null || (application.resumeSnapshot?.length ?? 0) > 0;
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [opening, setOpening] = useState(false);
   const history = [...application.history].reverse();
 
   function focusAndSelect(nextIdx: number) {
@@ -47,6 +56,30 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
     if (nextIdx !== null) {
       e.preventDefault();
       focusAndSelect(nextIdx);
+    }
+  }
+
+  async function handleViewResume() {
+    if (!uploadedFile) {
+      setResumeOpen(true);
+      return;
+    }
+    if (opening) return;
+    setOpening(true);
+    try {
+      const blob = await applicationService.downloadResumeFile(application.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = uploadedFile.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open this resume");
+    } finally {
+      setOpening(false);
     }
   }
 
@@ -112,20 +145,47 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
         <p className="text-sm text-muted-foreground">No cover letter was sent with this application.</p>
       )}
 
-      <button
-        type="button"
-        onClick={() => toast.info("Resume viewer is not connected yet")}
-        className="flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors hover:bg-muted/40"
-      >
+      <div className="flex items-center gap-3 rounded-xl border p-3.5">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground">
           <FileText className="size-[19px]" aria-hidden />
         </span>
-        <span className="flex flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[14px] font-bold text-foreground">Submitted resume</span>
-          <span className="text-[13px] text-muted-foreground">{resumeLabel} · approved by candidate</span>
+          <span className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{resumeLabel}</span>
         </span>
-        <span className="shrink-0 text-[14px] font-bold text-primary">Open</span>
-      </button>
+        {canViewResume ? (
+          <Button type="button" variant="outline" disabled={opening} onClick={() => void handleViewResume()}>
+            {opening && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            View resume
+          </Button>
+        ) : (
+          <span className="shrink-0 text-[13px] text-muted-foreground">Not available</span>
+        )}
+      </div>
+
+      <Dialog open={resumeOpen} onOpenChange={setResumeOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{application.candidate.name}&apos;s resume</DialogTitle>
+            <DialogDescription>{resumeLabel}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            {(application.resumeSnapshot ?? []).map((section) => (
+              <section key={section.id} className="flex flex-col gap-1.5">
+                <h3 className="text-[15px] font-bold text-foreground">{section.title}</h3>
+                {section.meta && <span className="text-[13px] text-muted-foreground">{section.meta}</span>}
+                {section.bullets.length > 0 && (
+                  <ul className="flex list-disc flex-col gap-1 pl-5 text-sm leading-relaxed text-foreground/85">
+                    {section.bullets.map((b) => (
+                      <li key={b.id}>{b.text}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <fieldset className="flex flex-col gap-2.5">
         <legend className="mb-1 text-sm font-bold">Update status</legend>
