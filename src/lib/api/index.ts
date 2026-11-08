@@ -5,3 +5,4 @@ export * as resumePreparation from "./resume-preparation";
 export * as applicationService from "./application";
 export * as companyService from "./company";
 export { ApiError } from "./errors";
+export * as notificationService from "./notification";

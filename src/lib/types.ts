@@ -364,3 +364,19 @@ export interface RecruiterProfile {
 }
 
 export type RecruiterProfileInput = Pick<RecruiterProfile, "displayName" | "jobTitle">;
+
+/** An in-app notification for the signed-in user (Notification Service). */
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  link: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface NotificationList {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
