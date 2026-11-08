@@ -24,14 +24,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService, candidateProfile, jobDiscovery, jobPosting, resumePreparation } from "@/lib/api";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { applicationState } from "@/lib/deadline";
 import { useAsync } from "@/lib/use-async";
 import { cn } from "@/lib/utils";
-import type { JobWithCompany, ResumeFormat } from "@/lib/types";
+import type { JobWithCompany } from "@/lib/types";
 
 const STEPS = [
   { n: 1, label: "Generate" },
@@ -154,19 +153,6 @@ function TailorResumeFlow() {
     }
   }
 
-  async function handleFormatChange(format: ResumeFormat) {
-    if (!draft || format === draft.format) return;
-    const previous = draft;
-    draftState.setData({ ...draft, format });
-    try {
-      const updated = await resumePreparation.selectResumeFormat(id, format);
-      draftState.setData(updated);
-    } catch (e) {
-      draftState.setData(previous);
-      toast.error(e instanceof Error ? e.message : "Could not change resume format");
-    }
-  }
-
   async function handleToggleSection(sectionId: string) {
     if (!draft) return;
     const previous = draft;
@@ -222,16 +208,6 @@ function TailorResumeFlow() {
   const coverLetterMissing = coverLetterRequired && coverLetter.trim() === "";
 
   const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
-  const formatOptions: { value: ResumeFormat; label: string; hint: string }[] = hasTemplate
-    ? [
-        {
-          value: "company",
-          label: `${job!.company.name} company style`,
-          hint: `Your tailored resume in ${job!.company.name}'s colors. To use the company's own template file, choose Upload my own resume instead and download it there.`,
-        },
-        { value: "personal", label: "My default format", hint: "Your personal layout from your profile" },
-      ]
-    : [{ value: "personal", label: "My default format", hint: "Your personal layout from your profile" }];
 
   return (
     <div className="flex flex-col gap-6">
@@ -268,36 +244,12 @@ function TailorResumeFlow() {
                 {matchState.data && <MatchBadge score={matchState.data.score} />}
               </section>
 
-              <section className="flex flex-col gap-3.5 rounded-2xl border bg-card p-6">
-                <h2 className="text-[17px] font-bold">Resume format</h2>
-                <RadioGroup
-                  aria-label="Resume format"
-                  value={draft.format}
-                  onValueChange={(value: ResumeFormat) => handleFormatChange(value)}
-                  className="gap-2.5"
-                >
-                  {formatOptions.map((opt) => (
-                    <label
-                      key={opt.value}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-3.5 rounded-2xl border-2 p-4 transition-colors",
-                        draft.format === opt.value ? "border-primary bg-primary-soft" : "border-border bg-background hover:bg-muted/40"
-                      )}
-                    >
-                      <RadioGroupItem value={opt.value} />
-                      <span className="flex flex-col gap-0.5 text-left">
-                        <span className="text-[15px] font-bold text-foreground">{opt.label}</span>
-                        <span className="text-[13px] text-muted-foreground">{opt.hint}</span>
-                      </span>
-                    </label>
-                  ))}
-                </RadioGroup>
-                {!hasTemplate && (
-                  <p className="text-[13px] text-muted-foreground">
-                    This job has no company template, so your default format is used.
-                  </p>
-                )}
-              </section>
+              {hasTemplate && (
+                <p className="rounded-2xl border bg-card p-5 text-[13px] text-muted-foreground">
+                  This company provides a resume template. To use it, go back and choose Upload my own resume, then
+                  download the template there.
+                </p>
+              )}
 
               <section className="flex flex-col gap-3.5 rounded-2xl border bg-card p-6">
                 <div className="flex items-center justify-between gap-3">
