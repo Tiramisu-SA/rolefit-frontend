@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
+import { NotificationBell } from "@/components/seeker/notification-bell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,9 +74,7 @@ export function SeekerShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          <Button type="button" variant="ghost" size="icon-lg" aria-label="Notifications">
-            <Bell className="size-5" aria-hidden />
-          </Button>
+          <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger
