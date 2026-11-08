@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService } from "@/lib/api";
 import { MATCH_TIER_CLASS, matchTier } from "@/lib/match";
-import { formatFileSize } from "@/lib/resume-file";
+import { RESUME_SOURCE_LABEL, formatFileSize } from "@/lib/resume-file";
 import { cn, formatDate } from "@/lib/utils";
 import type { ApplicationStatus, ApplicationView } from "@/lib/types";
 
@@ -33,7 +33,7 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
   const uploadedFile = application.resumeSource === "uploaded" ? application.resumeFile : null;
   const hasTemplate = Boolean(application.job.applicationSettings.resumeTemplateId);
   const resumeLabel = uploadedFile
-    ? `Uploaded by candidate · ${uploadedFile.fileName} (${formatFileSize(uploadedFile.sizeBytes)})${hasTemplate ? " (company template not used)" : ""}`
+    ? `${RESUME_SOURCE_LABEL.uploaded} · ${uploadedFile.fileName} (${formatFileSize(uploadedFile.sizeBytes)})${hasTemplate ? " (company template not used)" : ""}`
     : `${application.resumeFormat === "company" ? "Company template" : "Personal format"} · approved by candidate`;
   const canViewResume = uploadedFile !== null || (application.resumeSnapshot?.length ?? 0) > 0;
   const [resumeOpen, setResumeOpen] = useState(false);

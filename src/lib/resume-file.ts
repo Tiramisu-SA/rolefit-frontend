@@ -45,3 +45,10 @@ export async function fileToBase64(file: Blob): Promise<string> {
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(binary);
 }
+
+/** Turns a server message for a `resumeFile.*` field ("must be at most 5 MB") into a full sentence. */
+export function resumeFileErrorMessage(message: string): string {
+  if (/does not match/i.test(message)) return "This file isn't a real PDF or DOCX. Please export it again and retry.";
+  const text = /^[a-z]/.test(message) ? `Resume file ${message}` : message;
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}

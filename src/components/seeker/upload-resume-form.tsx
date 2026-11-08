@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, applicationService } from "@/lib/api";
 import { scopeErrors } from "@/lib/field-errors";
-import { formatFileSize, validateResumeFile } from "@/lib/resume-file";
+import { formatFileSize, resumeFileErrorMessage, validateResumeFile } from "@/lib/resume-file";
 import type { JobWithCompany } from "@/lib/types";
 
 /** Apply with a PDF or DOCX the seeker already has, instead of a resume tailored by AI. */
@@ -50,7 +50,8 @@ export function UploadResumeForm({ job }: { job: JobWithCompany }) {
       if (e instanceof ApiError && e.fieldErrors?.length) {
         const fileErrors = scopeErrors(e.fieldErrors, "resumeFile.");
         const topLevel = scopeErrors(e.fieldErrors);
-        setFileError(Object.values(fileErrors)[0] ?? topLevel.resumeFile ?? null);
+        const serverFileError = Object.values(fileErrors)[0] ?? topLevel.resumeFile;
+        setFileError(serverFileError ? resumeFileErrorMessage(serverFileError) : null);
         setCoverLetterError(topLevel.coverLetter ?? null);
         if (!Object.keys(fileErrors).length && !topLevel.resumeFile && !topLevel.coverLetter) setSubmitError(e.message);
       } else {

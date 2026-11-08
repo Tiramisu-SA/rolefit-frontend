@@ -6,6 +6,7 @@ import {
   fileToBase64,
   formatFileSize,
   resumeContentType,
+  resumeFileErrorMessage,
   validateResumeFile,
 } from "./resume-file";
 
@@ -53,5 +54,18 @@ describe("RESUME_SOURCE_LABEL", () => {
   it("labels both sources", () => {
     expect(RESUME_SOURCE_LABEL.uploaded).toBe("Uploaded by candidate");
     expect(RESUME_SOURCE_LABEL.tailored).toBe("Tailored with RoleFit");
+  });
+});
+
+describe("resumeFileErrorMessage", () => {
+  it("makes server fragments into sentences", () => {
+    expect(resumeFileErrorMessage("must be at most 5 MB")).toBe("Resume file must be at most 5 MB.");
+    expect(resumeFileErrorMessage("is not allowed")).toBe("Resume file is not allowed.");
+  });
+  it("explains a type mismatch", () => {
+    expect(resumeFileErrorMessage("does not match the declared file type")).toBe("This file isn't a real PDF or DOCX. Please export it again and retry.");
+  });
+  it("leaves full sentences alone", () => {
+    expect(resumeFileErrorMessage("File name is invalid.")).toBe("File name is invalid.");
   });
 });

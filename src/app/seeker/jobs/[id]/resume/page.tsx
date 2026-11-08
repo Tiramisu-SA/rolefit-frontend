@@ -10,8 +10,9 @@ import { CompanyAvatar } from "@/components/brand/company-avatar";
 import { MatchBadge } from "@/components/brand/match-badge";
 import { ErrorState, ListSkeleton } from "@/components/brand/page-states";
 import { ResumePreview } from "@/components/seeker/resume-preview";
+import { StatusBadge } from "@/components/brand/status-badge";
 import { UploadResumeForm } from "@/components/seeker/upload-resume-form";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService, candidateProfile, jobDiscovery, jobPosting, resumePreparation } from "@/lib/api";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
+import { applicationState } from "@/lib/deadline";
 import { useAsync } from "@/lib/use-async";
 import { cn } from "@/lib/utils";
 import type { JobWithCompany, ResumeFormat } from "@/lib/types";
@@ -468,12 +470,16 @@ function ChoiceCard({ icon, title, description, note, onClick }: { icon: ReactNo
 export default function ApplyPage() {
   const { id } = useParams<{ id: string }>();
   const jobState = useAsync(() => jobPosting.getJob(id), [id]);
+  const appsState = useAsync(() => applicationService.listMyApplications(), [id]);
   const [mode, setMode] = useState<"ai" | "upload" | null>(null);
 
   if (mode === "ai") return <TailorResumeFlow />;
 
   const job = jobState.data;
   const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
+  const myApplication = appsState.data?.find((a) => a.jobId === id);
+  const applyState = job ? applicationState(job.status, job.applicationSettings.applicationDeadline) : "closed";
+  // A closed job can still be opened to see an existing AI draft; only the upload option is gated.
 
   return (
     <div className="flex flex-col gap-6">
@@ -491,14 +497,27 @@ export default function ApplyPage() {
         )}
       </div>
 
-      {jobState.loading ? (
+      {jobState.loading || (appsState.loading && !job) ? (
         <ListSkeleton rows={2} className="h-72" />
       ) : jobState.error ? (
         <ErrorState message={jobState.error.message} onRetry={jobState.reload} />
-      ) : job && job.status !== "OPEN" ? (
-        <p className="rounded-2xl border bg-card p-6 text-[15px] text-muted-foreground">This job is no longer accepting applications.</p>
       ) : job && mode === "upload" ? (
-        <UploadResumeForm job={job} />
+        appsState.loading ? (
+          <ListSkeleton rows={2} className="h-72" />
+        ) : myApplication ? (
+          <div className="flex items-center gap-3">
+            <StatusBadge status={myApplication.status} />
+            <Link href="/seeker/applications" className={buttonVariants({ size: "lg" })}>
+              View application
+            </Link>
+          </div>
+        ) : applyState !== "open" ? (
+          <p className="rounded-2xl border bg-card p-6 text-[15px] text-muted-foreground">
+            {applyState === "deadline-passed" ? "Deadline passed · " : ""}No longer accepting applications
+          </p>
+        ) : (
+          <UploadResumeForm job={job} />
+        )
       ) : job ? (
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-extrabold tracking-tight">How do you want to apply to {job.title}?</h1>
