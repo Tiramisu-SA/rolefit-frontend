@@ -532,7 +532,7 @@ export default function ApplyPage() {
               icon={<Upload className="size-6" aria-hidden />}
               title="Upload my own resume"
               description="Send a PDF or DOCX you already have, as it is."
-              note={hasTemplate ? "This company provides a resume template. To use it, choose Tailor my resume with AI." : undefined}
+              note={hasTemplate ? "This company provides a resume template. Download it on the next step, or choose Tailor my resume with AI to use it." : undefined}
               onClick={() => setMode("upload")}
             />
           </div>

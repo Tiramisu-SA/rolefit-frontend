@@ -37,6 +37,11 @@ export const RESUME_SOURCE_LABEL: Record<ResumeSource, string> = {
   uploaded: "Uploaded by candidate",
 };
 
+/** What the recruiter sees for an uploaded resume: "Uploaded by candidate · resume.pdf (12.4 KB)". */
+export function uploadedResumeLabel(file: { fileName: string; sizeBytes: number }): string {
+  return `${RESUME_SOURCE_LABEL.uploaded} · ${file.fileName} (${formatFileSize(file.sizeBytes)})`;
+}
+
 /** Standard base64 of the file's bytes (no data-URL prefix). */
 export async function fileToBase64(file: Blob): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());

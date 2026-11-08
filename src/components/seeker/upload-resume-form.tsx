@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileText, Loader2, Upload } from "lucide-react";
+import { DownloadTemplateButton } from "@/components/seeker/download-template-button";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,6 +71,16 @@ export function UploadResumeForm({ job }: { job: JobWithCompany }) {
           Send a PDF or DOCX file (up to 5 MB) to {job.company.name} as it is. We won&apos;t change it.
         </p>
       </div>
+
+      {job.applicationSettings.resumeTemplateId && (
+        <div className="flex flex-col items-start gap-3 rounded-xl bg-primary-soft px-4 py-3.5">
+          <p className="text-sm font-semibold text-primary-soft-foreground">
+            This company provides a resume template. Download it, fill it in, then upload it here.
+          </p>
+          <DownloadTemplateButton jobId={job.id} variant="outline" />
+          <p className="text-xs text-muted-foreground">Prefer not to fill it in yourself? Go back and choose Tailor my resume with AI, which can use the template too.</p>
+        </div>
+      )}
 
       {submitError && (
         <p role="alert" className="rounded-lg bg-destructive-soft px-3.5 py-2.5 text-sm font-semibold text-destructive">

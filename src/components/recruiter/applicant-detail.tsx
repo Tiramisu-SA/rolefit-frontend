@@ -10,7 +10,8 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService } from "@/lib/api";
 import { MATCH_TIER_CLASS, matchTier } from "@/lib/match";
-import { RESUME_SOURCE_LABEL, formatFileSize } from "@/lib/resume-file";
+import { saveBlob } from "@/lib/download";
+import { uploadedResumeLabel } from "@/lib/resume-file";
 import { cn, formatDate } from "@/lib/utils";
 import type { ApplicationStatus, ApplicationView } from "@/lib/types";
 
@@ -31,9 +32,8 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
   const snapshot = application.matchSnapshot;
   const firstName = application.candidate.name.trim().split(/\s+/)[0] ?? application.candidate.name;
   const uploadedFile = application.resumeSource === "uploaded" ? application.resumeFile : null;
-  const hasTemplate = Boolean(application.job.applicationSettings.resumeTemplateId);
   const resumeLabel = uploadedFile
-    ? `${RESUME_SOURCE_LABEL.uploaded} · ${uploadedFile.fileName} (${formatFileSize(uploadedFile.sizeBytes)})${hasTemplate ? " (company template not used)" : ""}`
+    ? uploadedResumeLabel(uploadedFile)
     : `${application.resumeFormat === "company" ? "Company template" : "Personal format"} · approved by candidate`;
   const canViewResume = uploadedFile !== null || (application.resumeSnapshot?.length ?? 0) > 0;
   const [resumeOpen, setResumeOpen] = useState(false);
@@ -68,14 +68,7 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
     setOpening(true);
     try {
       const blob = await applicationService.downloadResumeFile(application.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = uploadedFile.fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      saveBlob(blob, uploadedFile.fileName);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not open this resume");
     } finally {

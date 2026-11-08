@@ -1,7 +1,8 @@
 import { companyFor, initialsOf } from "@/lib/companies";
 import type { Company, JobPosting, JobPostingInput, JobStatus, JobWithCompany, ResumeTemplateInfo } from "@/lib/types";
 import { ApiError } from "./errors";
-import { gatewayRequest } from "./gateway";
+import { saveBlob } from "@/lib/download";
+import { gatewayDownloadFile, gatewayRequest } from "./gateway";
 import { toJobPosting, toProtoJobInput, toProtoStatus, toResumeTemplateInfo } from "./job-mapper";
 
 // What pages call for jobs. The API Gateway turns these REST calls into Job
@@ -101,4 +102,18 @@ export async function listOpenJobs(opts: { query?: string } = {}): Promise<JobWi
 
 export async function getJob(id: string): Promise<JobWithCompany> {
   return jobOf(await request<Msg>("GET", `/${encodeURIComponent(id)}`));
+}
+
+export const RESUME_TEMPLATE_FALLBACK_NAME = "resume-template";
+
+/** The job's company resume template file (any signed-in user), with the name the server gave it. */
+export async function fetchResumeTemplate(jobId: string): Promise<{ blob: Blob; fileName: string }> {
+  const { blob, fileName } = await gatewayDownloadFile(`/api/jobs/${encodeURIComponent(jobId)}/resume-template/download`, { serviceName: "job service" });
+  return { blob, fileName: fileName ?? RESUME_TEMPLATE_FALLBACK_NAME };
+}
+
+/** Downloads the job's company resume template and saves it on the user's device. */
+export async function downloadResumeTemplate(jobId: string): Promise<void> {
+  const { blob, fileName } = await fetchResumeTemplate(jobId);
+  saveBlob(blob, fileName);
 }

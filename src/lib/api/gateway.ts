@@ -33,8 +33,26 @@ async function accessToken(): Promise<string | undefined> {
   return data.session?.access_token;
 }
 
-/** The same as `gatewayRequest`, for a route that answers with a file: returns the bytes. */
-export async function gatewayDownload(path: string, init: Pick<GatewayRequestInit, "serviceName"> = {}): Promise<Blob> {
+/** The file name from a Content-Disposition header (`filename*=UTF-8''...` first, then `filename=`), or undefined. */
+export function fileNameFromContentDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const extended = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header)?.[1]?.trim();
+  if (extended) {
+    try {
+      return decodeURIComponent(extended);
+    } catch {
+      // fall through to the plain filename
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header);
+  return (plain?.[1] ?? plain?.[2])?.trim() || undefined;
+}
+
+/** The same as `gatewayRequest`, for a route that answers with a file: returns the bytes and the name the server gave it. */
+export async function gatewayDownloadFile(
+  path: string,
+  init: Pick<GatewayRequestInit, "serviceName"> = {},
+): Promise<{ blob: Blob; fileName?: string }> {
   const service = init.serviceName ?? "RoleFit server";
   const headers = new Headers();
   const token = await accessToken();
@@ -49,7 +67,12 @@ export async function gatewayDownload(path: string, init: Pick<GatewayRequestIni
     const data = (await res.json().catch(() => null)) as ErrorBody | null;
     throw new ApiError(data?.error?.code ?? "INTERNAL", data?.error?.message ?? `The ${service} returned an error (${res.status}).`, res.status, data?.error?.details);
   }
-  return res.blob();
+  return { blob: await res.blob(), fileName: fileNameFromContentDisposition(res.headers.get("Content-Disposition")) };
+}
+
+/** The same as `gatewayDownloadFile`, when only the bytes are needed. */
+export async function gatewayDownload(path: string, init: Pick<GatewayRequestInit, "serviceName"> = {}): Promise<Blob> {
+  return (await gatewayDownloadFile(path, init)).blob;
 }
 
 /** Calls `path` (e.g. "/api/candidates/profiles/me") on the gateway. Throws ApiError on failure. */

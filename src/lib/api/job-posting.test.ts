@@ -133,3 +133,40 @@ describe("job posting client", () => {
     expect((await jobsApi.getRecruiterCompany()).name).toBe("Acme Corp");
   });
 });
+
+describe("fetchResumeTemplate", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_API_GATEWAY_URL", GW);
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    getSession.mockResolvedValue({ data: { session: { access_token: "test-token" } } });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("downloads through the gateway with the token and uses the Content-Disposition name", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("docx", { status: 200, headers: { "Content-Disposition": "attachment; filename=\"x.docx\"; filename*=UTF-8''Brightline%20standard%20resume.docx" } }),
+    );
+    const { blob, fileName } = await jobsApi.fetchResumeTemplate("job 1");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect([url, init.method]).toEqual([`${GW}/api/jobs/job%201/resume-template/download`, "GET"]);
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+    expect(fileName).toBe("Brightline standard resume.docx");
+    expect(await blob.text()).toBe("docx");
+  });
+
+  it("falls back to a plain filename, then to resume-template", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("a", { headers: { "Content-Disposition": "attachment; filename=\"plain.pdf\"" } }));
+    expect((await jobsApi.fetchResumeTemplate("j")).fileName).toBe("plain.pdf");
+    fetchMock.mockResolvedValueOnce(new Response("a"));
+    expect((await jobsApi.fetchResumeTemplate("j")).fileName).toBe("resume-template");
+  });
+
+  it("keeps the service's error when there is no template", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(404, { error: { code: "NOT_FOUND", message: "No template" } }));
+    await expect(jobsApi.fetchResumeTemplate("j")).rejects.toMatchObject({ code: "NOT_FOUND", status: 404 });
+  });
+});

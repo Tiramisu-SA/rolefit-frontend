@@ -4,13 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Bookmark, FileText, Sparkles } from "lucide-react";
+import { Bookmark, Sparkles } from "lucide-react";
 import { CompanyAvatar } from "@/components/brand/company-avatar";
 import { MatchBadge } from "@/components/brand/match-badge";
 import { MatchRing } from "@/components/brand/match-ring";
 import { ErrorState } from "@/components/brand/page-states";
 import { StatusBadge } from "@/components/brand/status-badge";
 import { CompanyCard } from "@/components/company/company-card";
+import { DownloadTemplateButton } from "@/components/seeker/download-template-button";
 import { MatchPanel } from "@/components/seeker/match-panel";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -149,10 +150,9 @@ export default function JobDetailPage() {
                 )}
 
                 {job.applicationSettings.resumeTemplateId && (
-                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="size-4" aria-hidden />
-                    This company provides a resume template
-                  </span>
+                  <DownloadTemplateButton jobId={job.id} variant="ghost" size="sm" className="text-muted-foreground">
+                    This company provides a resume template · Download
+                  </DownloadTemplateButton>
                 )}
 
                 {deadline && applyState === "open" && (

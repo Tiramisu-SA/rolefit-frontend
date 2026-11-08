@@ -3,6 +3,7 @@ import {
   DOCX_CONTENT_TYPE,
   RESUME_FILE_MAX_BYTES,
   RESUME_SOURCE_LABEL,
+  uploadedResumeLabel,
   fileToBase64,
   formatFileSize,
   resumeContentType,
@@ -67,5 +68,11 @@ describe("resumeFileErrorMessage", () => {
   });
   it("leaves full sentences alone", () => {
     expect(resumeFileErrorMessage("File name is invalid.")).toBe("File name is invalid.");
+  });
+});
+
+describe("uploadedResumeLabel", () => {
+  it("shows only who uploaded it, the file name and its size", () => {
+    expect(uploadedResumeLabel({ fileName: "Jane.pdf", sizeBytes: 12698 })).toBe("Uploaded by candidate · Jane.pdf (12.4 KB)");
   });
 });
