@@ -1,7 +1,8 @@
 import { profileInitials } from "@/lib/profile";
-import type { Application, ApplicationStatus, ApplicationView, JobWithCompany, MatchSnapshot } from "@/lib/types";
+import { fileToBase64, resumeContentType } from "@/lib/resume-file";
+import type { Application, ApplicationResumeFile, ApplicationStatus, ApplicationView, JobWithCompany, MatchSnapshot, ResumeSnapshotSection } from "@/lib/types";
 import { ApiError } from "./errors";
-import { gatewayRequest } from "./gateway";
+import { gatewayDownload, gatewayRequest } from "./gateway";
 import * as jobPosting from "./job-posting";
 
 // REST client for the Application Service, reached through the API Gateway
@@ -27,6 +28,21 @@ function toMatchSnapshot(raw: Msg | null | undefined): MatchSnapshot | null {
   };
 }
 
+function toResumeFile(raw: Msg | null | undefined): ApplicationResumeFile | null {
+  if (!raw || typeof raw.fileName !== "string") return null;
+  return { fileName: raw.fileName, contentType: raw.contentType ?? "", sizeBytes: Number(raw.sizeBytes) || 0 };
+}
+
+function toResumeSnapshot(raw: Msg | null | undefined): ResumeSnapshotSection[] | null {
+  if (!raw || !Array.isArray(raw.sections)) return null;
+  return raw.sections.map((s: Msg) => ({
+    id: String(s.id ?? ""),
+    title: s.title ?? "",
+    meta: s.meta ?? "",
+    bullets: (s.bullets ?? []).map((b: Msg) => ({ id: String(b.id ?? ""), text: b.text ?? "" })),
+  }));
+}
+
 /** The service's application → the frontend type. The service keeps only the candidate's name and email. */
 export function toApplication(raw: Msg): Application {
   const name: string = raw.candidate?.name ?? "";
@@ -37,6 +53,9 @@ export function toApplication(raw: Msg): Application {
     candidate: { id: raw.candidate?.id ?? raw.candidateId, name, initials: profileInitials(name), headline: "", email: raw.candidate?.email ?? "" },
     resumeDraftId: raw.resumeReference?.draftId ?? "",
     resumeFormat: raw.resumeReference?.format === "company" ? "company" : "personal",
+    resumeSource: raw.resumeSource === "uploaded" ? "uploaded" : "tailored",
+    resumeFile: toResumeFile(raw.resumeFile),
+    resumeSnapshot: toResumeSnapshot(raw.resumeSnapshot),
     status: raw.status,
     submittedAt: raw.submittedAt,
     updatedAt: raw.updatedAt,
@@ -67,12 +86,21 @@ async function jobsFor(ids: string[]): Promise<Map<string, JobWithCompany>> {
 export const COVER_LETTER_MAX_LENGTH = 10_000;
 
 /**
- * Applies to an open job with the approved resume; the service snapshots the resume and the match.
+ * Applies to an open job. Without a file, the approved resume is used and the service snapshots it
+ * and the match; with a PDF or DOCX file, that file is sent (base64) as the resume instead.
  * The job is fetched first so a lookup failure happens before anything is saved.
  */
-export async function submitApplication(jobId: string, coverLetter?: string): Promise<ApplicationView> {
+export async function submitApplication(jobId: string, coverLetter?: string, resumeFile?: File): Promise<ApplicationView> {
   const job = await jobPosting.getJob(jobId);
-  const body = coverLetter?.trim() ? { jobId, coverLetter: coverLetter.trim() } : { jobId };
+  const body: Msg = { jobId };
+  if (coverLetter?.trim()) body.coverLetter = coverLetter.trim();
+  if (resumeFile) {
+    body.resumeFile = {
+      fileName: resumeFile.name,
+      contentType: resumeContentType(resumeFile.name) ?? resumeFile.type,
+      contentBase64: await fileToBase64(resumeFile),
+    };
+  }
   const { application } = await request<{ application: Msg }>("POST", "", { json: body });
   return { ...toApplication(application), job };
 }
@@ -111,3 +139,7 @@ export async function updateApplicationStatus(
   const updated = toApplication(res.application);
   return { ...updated, job: job ?? (await jobPosting.getMyJob(updated.jobId)), notificationQueued: Boolean(res.notificationQueued) };
 }
+
+/** The resume file an applicant uploaded, fetched with the user's token. */
+export const downloadResumeFile = (id: string): Promise<Blob> =>
+  gatewayDownload(`/api/applications/${encodeURIComponent(id)}/resume-file`, { serviceName: "application service" });

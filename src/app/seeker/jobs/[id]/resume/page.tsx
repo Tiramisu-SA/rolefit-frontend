@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Loader2, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { CompanyAvatar } from "@/components/brand/company-avatar";
 import { MatchBadge } from "@/components/brand/match-badge";
 import { ErrorState, ListSkeleton } from "@/components/brand/page-states";
 import { ResumePreview } from "@/components/seeker/resume-preview";
-import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/brand/status-badge";
+import { UploadResumeForm } from "@/components/seeker/upload-resume-form";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -25,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { applicationService, candidateProfile, jobDiscovery, jobPosting, resumePreparation } from "@/lib/api";
 import { CreateProfileBanner } from "@/components/seeker/create-profile-banner";
+import { applicationState } from "@/lib/deadline";
 import { useAsync } from "@/lib/use-async";
 import { cn } from "@/lib/utils";
 import type { JobWithCompany, ResumeFormat } from "@/lib/types";
@@ -93,7 +97,7 @@ function GenerateCard({ job, generating, onGenerate }: { job: JobWithCompany; ge
   );
 }
 
-export default function ResumeTailorPage() {
+function TailorResumeFlow() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -443,6 +447,97 @@ export default function ResumeTailorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ChoiceCard({ icon, title, description, note, onClick }: { icon: ReactNode; title: string; description: string; note?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-1 flex-col items-start gap-3 rounded-2xl border-2 border-border bg-card p-6 text-left transition-colors hover:border-primary hover:bg-primary-soft"
+    >
+      <span className="flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground">{icon}</span>
+      <span className="text-[17px] font-bold text-foreground">{title}</span>
+      <span className="text-sm text-muted-foreground">{description}</span>
+      {note && <span className="text-[13px] font-semibold text-foreground/80">{note}</span>}
+    </button>
+  );
+}
+
+/** First step of applying: tailor a resume with AI (the original flow) or upload your own file. */
+export default function ApplyPage() {
+  const { id } = useParams<{ id: string }>();
+  const jobState = useAsync(() => jobPosting.getJob(id), [id]);
+  const appsState = useAsync(() => applicationService.listMyApplications(), [id]);
+  const [mode, setMode] = useState<"ai" | "upload" | null>(null);
+
+  if (mode === "ai") return <TailorResumeFlow />;
+
+  const job = jobState.data;
+  const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
+  const myApplication = appsState.data?.find((a) => a.jobId === id);
+  const applyState = job ? applicationState(job.status, job.applicationSettings.applicationDeadline) : "closed";
+  // A closed job can still be opened to see an existing AI draft; only the upload option is gated.
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {mode === "upload" ? (
+          <button type="button" onClick={() => setMode(null)} className="flex items-center gap-2 text-[15px] font-semibold text-foreground/80 hover:text-primary">
+            <ArrowLeft className="size-4.5" aria-hidden />
+            Back to resume options
+          </button>
+        ) : (
+          <Link href={`/seeker/jobs/${id}`} className="flex items-center gap-2 text-[15px] font-semibold text-foreground/80 hover:text-primary">
+            <ArrowLeft className="size-4.5" aria-hidden />
+            Back to job
+          </Link>
+        )}
+      </div>
+
+      {jobState.loading || (appsState.loading && !job) ? (
+        <ListSkeleton rows={2} className="h-72" />
+      ) : jobState.error ? (
+        <ErrorState message={jobState.error.message} onRetry={jobState.reload} />
+      ) : job && mode === "upload" ? (
+        appsState.loading ? (
+          <ListSkeleton rows={2} className="h-72" />
+        ) : myApplication ? (
+          <div className="flex items-center gap-3">
+            <StatusBadge status={myApplication.status} />
+            <Link href="/seeker/applications" className={buttonVariants({ size: "lg" })}>
+              View application
+            </Link>
+          </div>
+        ) : applyState !== "open" ? (
+          <p className="rounded-2xl border bg-card p-6 text-[15px] text-muted-foreground">
+            {applyState === "deadline-passed" ? "Deadline passed · " : ""}No longer accepting applications
+          </p>
+        ) : (
+          <UploadResumeForm job={job} />
+        )
+      ) : job ? (
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-extrabold tracking-tight">How do you want to apply to {job.title}?</h1>
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <ChoiceCard
+              icon={<Sparkles className="size-6" aria-hidden />}
+              title="Tailor my resume with AI"
+              description="We select and rephrase content from your verified profile to match this role. You review it before sending."
+              onClick={() => setMode("ai")}
+            />
+            <ChoiceCard
+              icon={<Upload className="size-6" aria-hidden />}
+              title="Upload my own resume"
+              description="Send a PDF or DOCX you already have, as it is."
+              note={hasTemplate ? "This company provides a resume template. To use it, choose Tailor my resume with AI." : undefined}
+              onClick={() => setMode("upload")}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

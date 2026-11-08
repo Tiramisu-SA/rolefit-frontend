@@ -45,6 +45,7 @@ describe("toApplication", () => {
       id: "app_1", jobId: "job_1", candidateId: "c1",
       candidate: { id: "c1", name: "Mai Srisuk", initials: "MS", headline: "", email: "mai@example.com" },
       resumeDraftId: "draft_9", resumeFormat: "company", status: "Submitted",
+      resumeSource: "tailored", resumeFile: null, resumeSnapshot: null,
       submittedAt: "2026-10-02T00:00:00.000Z", updatedAt: "2026-10-02T00:00:00.000Z",
       matchSnapshot: { score: 72, summary: "Good fit", capturedAt: "2026-10-02T00:00:00.000Z" },
       coverLetter: null,
@@ -55,6 +56,25 @@ describe("toApplication", () => {
   it("keeps the cover letter the seeker sent, and treats an empty one as none", () => {
     expect(applications.toApplication(rawApp({ coverLetter: "Dear team,\nI'd love to join." })).coverLetter).toBe("Dear team,\nI'd love to join.");
     expect(applications.toApplication(rawApp({ coverLetter: "" })).coverLetter).toBeNull();
+  });
+
+  it("maps an uploaded resume's file details", () => {
+    const app = applications.toApplication(
+      rawApp({ resumeSource: "uploaded", resumeReference: null, resumeFile: { fileName: "Jane.pdf", contentType: "application/pdf", sizeBytes: 2048 } }),
+    );
+    expect(app.resumeSource).toBe("uploaded");
+    expect(app.resumeFile).toEqual({ fileName: "Jane.pdf", contentType: "application/pdf", sizeBytes: 2048 });
+  });
+
+  it("maps the approved resume sections of a tailored application", () => {
+    const app = applications.toApplication(
+      rawApp({
+        resumeSource: "tailored",
+        resumeFile: null,
+        resumeSnapshot: { sections: [{ id: "s1", kind: "experience", title: "Acme", meta: "2020 - 2022", emphasized: true, bullets: [{ id: "b1", text: "Built it", tailored: true }] }] },
+      }),
+    );
+    expect(app.resumeSnapshot).toEqual([{ id: "s1", title: "Acme", meta: "2020 - 2022", bullets: [{ id: "b1", text: "Built it" }] }]);
   });
 
   it("handles legacy rows without resume or match snapshots", () => {
@@ -89,6 +109,33 @@ describe("application client", () => {
     fetchMock.mockClear();
     await applications.submitApplication("job_1", "   ");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ jobId: "job_1" });
+  });
+
+  it("sends an uploaded resume as base64 with its content type", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url.startsWith(`${GW}/api/applications`) ? jsonResponse(201, { application: rawApp({ resumeSource: "uploaded" }) }) : jsonResponse(200, { job: protoJob("job_1") }),
+    );
+    const file = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], "Jane_Doe.PDF", { type: "" });
+    await applications.submitApplication("job_1", "Hi", file);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      jobId: "job_1",
+      coverLetter: "Hi",
+      resumeFile: { fileName: "Jane_Doe.PDF", contentType: "application/pdf", contentBase64: "JVBERi0=" },
+    });
+  });
+
+  it("downloads an uploaded resume through the gateway with the user's token", async () => {
+    fetchMock.mockResolvedValue(new Response("bytes", { status: 200, headers: { "Content-Type": "application/pdf" } }));
+    const blob = await applications.downloadResumeFile("app 1");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect([url, init.method]).toEqual([`${GW}/api/applications/app%201/resume-file`, "GET"]);
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+    expect(await blob.text()).toBe("bytes");
+  });
+
+  it("keeps the service's error when the download fails", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(404, { error: { code: "RESUME_FILE_NOT_FOUND", message: "No uploaded resume" } }));
+    await expect(applications.downloadResumeFile("app_1")).rejects.toMatchObject({ code: "RESUME_FILE_NOT_FOUND", status: 404 });
   });
 
   it("does not submit when the job cannot be fetched", async () => {
