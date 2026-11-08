@@ -117,7 +117,7 @@ export function ResumePreview({
     <article aria-label="Resume preview" className="flex flex-col gap-6 rounded-md bg-white px-5 py-6 text-slate-900 shadow-lg sm:px-10 sm:py-10 lg:px-14 lg:py-12">
       {isCompany ? (
         <div
-          aria-label={companyName ? `${companyName} company template header` : undefined}
+          aria-label={companyName ? `${companyName} company style header` : undefined}
           className="-mx-5 -mt-6 flex flex-wrap items-end justify-between gap-3 px-5 py-6 sm:-mx-10 sm:-mt-10 sm:px-10 lg:-mx-14 lg:-mt-12 lg:px-14"
           style={{ backgroundColor: companyColor ?? "#0F766E" }}
         >
