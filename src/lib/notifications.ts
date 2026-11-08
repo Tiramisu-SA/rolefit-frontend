@@ -25,5 +25,7 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
 
 /** The server's link if it is an in-app path; otherwise the fallback (never an external or script URL). */
 export function internalLink(link: string, fallback = "/seeker/applications"): string {
-  return link.startsWith("/") && !link.startsWith("//") && !link.includes("\\") ? link : fallback;
+  // Browsers drop tabs/newlines and treat "\" like "/", so "/\t/evil.com" would become "//evil.com".
+  const safe = typeof link === "string" && link.startsWith("/") && !link.startsWith("//") && !/[\u0000-\u001f\u007f\s\\]/.test(link);
+  return safe ? link : fallback;
 }

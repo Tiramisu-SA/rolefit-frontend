@@ -25,7 +25,10 @@ describe("notifications formatting", () => {
 
   it("keeps only internal links", () => {
     const fb = "/seeker/applications";
-    for (const bad of ["//x", "https://x", "javascript:x", "/\\x", ""]) expect(internalLink(bad)).toBe(fb);
+    for (const bad of ["//x", "https://x", "javascript:x", "/\\x", "", "/\t/evil.com", "/\n/evil.com", "/ /x"]) {
+      expect(internalLink(bad)).toBe(fb);
+    }
+    expect(internalLink(undefined as unknown as string)).toBe(fb);
     expect(internalLink("/seeker/jobs/1")).toBe("/seeker/jobs/1");
   });
 });
