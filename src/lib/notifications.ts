@@ -22,3 +22,8 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (days < 30) return `${days}d ago`;
   return new Date(at).toLocaleDateString();
 }
+
+/** The server's link if it is an in-app path; otherwise the fallback (never an external or script URL). */
+export function internalLink(link: string, fallback = "/seeker/applications"): string {
+  return link.startsWith("/") && !link.startsWith("//") && !link.includes("\\") ? link : fallback;
+}

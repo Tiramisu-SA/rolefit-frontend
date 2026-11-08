@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badgeLabel, bellAriaLabel, relativeTime } from "./notifications";
+import { badgeLabel, bellAriaLabel, internalLink, relativeTime } from "./notifications";
 
 describe("notifications formatting", () => {
   it("hides the badge at 0 and caps at 9+", () => {
@@ -21,5 +21,11 @@ describe("notifications formatting", () => {
     expect(relativeTime("2026-11-08T09:00:00Z", now)).toBe("3h ago");
     expect(relativeTime("2026-11-06T12:00:00Z", now)).toBe("2d ago");
     expect(relativeTime("garbage", now)).toBe("");
+  });
+
+  it("keeps only internal links", () => {
+    const fb = "/seeker/applications";
+    for (const bad of ["//x", "https://x", "javascript:x", "/\\x", ""]) expect(internalLink(bad)).toBe(fb);
+    expect(internalLink("/seeker/jobs/1")).toBe("/seeker/jobs/1");
   });
 });
