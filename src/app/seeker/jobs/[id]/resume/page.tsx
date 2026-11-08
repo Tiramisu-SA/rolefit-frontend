@@ -224,7 +224,11 @@ function TailorResumeFlow() {
   const hasTemplate = Boolean(job?.applicationSettings.resumeTemplateId);
   const formatOptions: { value: ResumeFormat; label: string; hint: string }[] = hasTemplate
     ? [
-        { value: "company", label: `${job!.company.name} company template`, hint: "Provided by the recruiter for this job" },
+        {
+          value: "company",
+          label: `${job!.company.name} company style`,
+          hint: `Your tailored resume in ${job!.company.name}'s colors. To use the company's own template file, choose Upload my own resume instead and download it there.`,
+        },
         { value: "personal", label: "My default format", hint: "Your personal layout from your profile" },
       ]
     : [{ value: "personal", label: "My default format", hint: "Your personal layout from your profile" }];
@@ -532,7 +536,7 @@ export default function ApplyPage() {
               icon={<Upload className="size-6" aria-hidden />}
               title="Upload my own resume"
               description="Send a PDF or DOCX you already have, as it is."
-              note={hasTemplate ? "This company provides a resume template. Download it on the next step, or choose Tailor my resume with AI to use it." : undefined}
+              note={hasTemplate ? "This company provides a resume template. Download it on the next step, fill it in and upload it." : undefined}
               onClick={() => setMode("upload")}
             />
           </div>

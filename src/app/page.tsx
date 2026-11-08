@@ -37,7 +37,7 @@ const STEPS = [
   {
     n: "3",
     title: "Apply with a tailored resume",
-    body: "Generate a resume for that specific role, use the company template or your own format, then edit and approve it before sending.",
+    body: "Generate a resume for that specific role, in the company's style or your own format, then edit and approve it before sending. Or upload your own resume, filled in from the company's template if it has one.",
   },
 ];
 

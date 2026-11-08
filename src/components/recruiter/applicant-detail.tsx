@@ -34,7 +34,7 @@ export function ApplicantDetail({ application, onUpdated }: { application: Appli
   const uploadedFile = application.resumeSource === "uploaded" ? application.resumeFile : null;
   const resumeLabel = uploadedFile
     ? uploadedResumeLabel(uploadedFile)
-    : `${application.resumeFormat === "company" ? "Company template" : "Personal format"} · approved by candidate`;
+    : `${application.resumeFormat === "company" ? "Company style" : "Personal format"} · approved by candidate`;
   const canViewResume = uploadedFile !== null || (application.resumeSnapshot?.length ?? 0) > 0;
   const [resumeOpen, setResumeOpen] = useState(false);
   const [opening, setOpening] = useState(false);
